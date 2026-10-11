@@ -17,6 +17,14 @@ router.get('/me', async (req, res, next) => {
   }
 });
 
+router.patch('/me/profile', async (req, res, next) => {
+  try {
+    return res.json(await dashboard.updateProfile(req.user._id, req.body));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.put('/me/availability', async (req, res, next) => {
   try {
     return res.json(await dashboard.updateAvailability(req.user._id, req.body));

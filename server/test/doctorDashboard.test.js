@@ -41,6 +41,7 @@ function fakeDoctor(availability = weekdayAvailability) {
 function fakeModels({
   doctor = fakeDoctor(),
   appointments = [],
+  counts = {},
   findOneAndUpdate,
   findByIdAndUpdate,
 } = {}) {
@@ -48,7 +49,7 @@ function fakeModels({
   const Doctor = {
     findOne(filter) {
       calls.profileFilter = filter;
-      return { populate: async () => doctor };
+      return { populate: async () => String(filter.user) === String(doctor.user._id) ? doctor : null };
     },
     findByIdAndUpdate(id, update, options) {
       calls.profileUpdate = { id, update, options };
@@ -66,7 +67,7 @@ function fakeModels({
         then(resolve, reject) { return Promise.resolve(appointments).then(resolve, reject); },
       };
     },
-    countDocuments: async () => appointments.length,
+    countDocuments: async (filter = {}) => filter.status ? (counts[filter.status] ?? appointments.filter((appointment) => appointment.status === filter.status).length) : (counts.total ?? appointments.length),
     findOneAndUpdate(filter, update, options) {
       calls.statusUpdate = { filter, update, options };
       return {
@@ -130,6 +131,16 @@ test('doctor appointment list is scoped to the profile linked to the authenticat
   assert.equal(result.appointments[0].patient.name, 'A patient');
 });
 
+test('doctor dashboard summary and pagination totals count database records beyond the current page', async () => {
+  const models = fakeModels({ appointments: [scheduledAppointment], counts: { total: 27, requested: 8, accepted: 6 } });
+  const service = createDoctorDashboardService({ ...models, clock: () => now });
+  const result = await service.listAppointments(doctorUserId, { page: '2', limit: '1' });
+
+  assert.equal(result.appointments.length, 1);
+  assert.deepEqual(result.pagination, { page: 2, limit: 1, total: 27, pages: 27 });
+  assert.deepEqual(result.summary, { totalAppointments: 27, requestedAppointments: 8, acceptedAppointments: 6 });
+});
+
 test('doctor status update is scoped and rejection atomically releases the active slot key', async () => {
   const models = fakeModels({ findOneAndUpdate: async () => ({ ...scheduledAppointment, status: 'rejected' }) });
   const service = createDoctorDashboardService({ ...models, clock: () => now });
@@ -142,6 +153,21 @@ test('doctor status update is scoped and rejection atomically releases the activ
   });
   assert.deepEqual(models.calls.statusUpdate.update.$unset, { activeSlotKey: 1 });
   assert.equal(result.appointment.status, 'rejected');
+});
+
+test('doctor can complete only an owned accepted appointment and releases its reserved slot key', async () => {
+  const accepted = { ...scheduledAppointment, status: 'accepted' };
+  const models = fakeModels({ appointments: [accepted], findOneAndUpdate: async () => ({ ...accepted, status: 'completed' }) });
+  const service = createDoctorDashboardService({ ...models, clock: () => now });
+  const result = await service.updateAppointmentStatus(doctorUserId, appointmentId, { status: 'completed' });
+
+  assert.deepEqual(models.calls.statusUpdate.filter, { _id: appointmentId, doctor: doctorProfileId, status: 'accepted' });
+  assert.deepEqual(models.calls.statusUpdate.update.$unset, { activeSlotKey: 1 });
+  assert.equal(result.appointment.status, 'completed');
+
+  const foreign = fakeModels({ appointments: [{ ...accepted, doctor: otherDoctorProfileId }] });
+  const foreignService = createDoctorDashboardService({ ...foreign, clock: () => now });
+  await assert.rejects(foreignService.updateAppointmentStatus(doctorUserId, appointmentId, { status: 'completed' }), (error) => error.status === 404 && error.code === 'APPOINTMENT_NOT_FOUND');
 });
 
 test('doctor cannot update another doctor appointment and cannot transition a non-requested appointment', async () => {
@@ -167,10 +193,29 @@ test('invalid doctor appointment statuses are rejected before any write', async 
   const models = fakeModels();
   const service = createDoctorDashboardService({ ...models, clock: () => now });
   await assert.rejects(
-    service.updateAppointmentStatus(doctorUserId, appointmentId, { status: 'completed' }),
+    service.updateAppointmentStatus(doctorUserId, appointmentId, { status: 'canceled' }),
     (error) => error.status === 400 && error.code === 'INVALID_STATUS',
   );
   assert.equal(models.calls.statusUpdate, undefined);
+});
+
+test('cancelled, rejected, requested, and completed appointments cannot be marked completed', async () => {
+  for (const status of ['cancelled', 'rejected', 'requested', 'completed']) {
+    const models = fakeModels({ appointments: [{ ...scheduledAppointment, status }] });
+    const service = createDoctorDashboardService({ ...models, clock: () => now });
+    await assert.rejects(service.updateAppointmentStatus(doctorUserId, appointmentId, { status: 'completed' }), (error) => error.status === 409 && error.code === 'INVALID_STATUS_TRANSITION');
+    assert.equal(models.calls.statusUpdate.filter.status, 'accepted');
+  }
+});
+
+test('doctor can update only safe fields on the linked profile', async () => {
+  const models = fakeModels();
+  const service = createDoctorDashboardService({ ...models, clock: () => now });
+  const result = await service.updateProfile(doctorUserId, { specialty: '  Pediatrics ', bio: 'New bio', consultationFee: 750 });
+  assert.deepEqual(models.calls.profileUpdate.update.$set, { specialty: 'Pediatrics', bio: 'New bio', consultationFee: 750 });
+  assert.equal(result.doctor.name, 'Dr. Test');
+  await assert.rejects(service.updateProfile('507f1f77bcf86cd799439013', { specialty: 'Other' }), (error) => error.status === 404 && error.code === 'DOCTOR_PROFILE_NOT_FOUND');
+  await assert.rejects(service.updateProfile(doctorUserId, { role: 'admin' }), (error) => error.status === 400 && error.code === 'INVALID_PROFILE');
 });
 
 test('availability update reports future booking conflicts and leaves profile unchanged', async () => {
@@ -219,4 +264,13 @@ test('doctor-only middleware rejects patients', () => {
   assert.equal(status, 403);
   assert.equal(body.error.code, 'FORBIDDEN');
   assert.equal(continued, false);
+});
+
+test('doctor profile and completion routes reject non-doctor roles', () => {
+  let status;
+  let body;
+  const response = { status(code) { status = code; return this; }, json(value) { body = value; return this; } };
+  requireRole('doctor')({ user: { role: 'patient' } }, response, () => assert.fail('patient must not reach doctor profile or appointment actions'));
+  assert.equal(status, 403);
+  assert.equal(body.error.code, 'FORBIDDEN');
 });

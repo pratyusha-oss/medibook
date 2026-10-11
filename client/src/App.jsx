@@ -508,7 +508,7 @@ function weekdayName(day) {
 function DoctorCard({ doctor, index, onOpen }) {
   return <article className={`doctor-card card-tone-${index % 4}`}>
     <div className="card-topline"><span className="specialty-pill">{doctor.specialty}</span><span className="card-symbol" aria-hidden="true">✳</span></div>
-    <div className="doctor-card-person"><div className="doctor-avatar">{initials(doctor.name)}</div><div><h3>Dr. {doctor.name}</h3><span className="verified-text"><span>✓</span> Verified professional</span></div></div>
+    <div className="doctor-card-person"><div className="doctor-avatar">{initials(doctor.name)}</div><div><h3>Dr. {doctor.name}</h3><span className="doctor-specialty-caption">{doctor.specialty}</span></div></div>
     <p className="doctor-bio">{doctor.bio || 'A compassionate professional, ready to listen and help you feel your best.'}</p>
     <div className="doctor-card-bottom"><div className="fee-display"><small>Consultation</small><strong>₹{Number(doctor.consultationFee).toLocaleString('en-IN')}</strong></div><button className="button button-card" type="button" onClick={onOpen}>View profile <span aria-hidden="true">↗</span></button></div>
   </article>;
@@ -540,6 +540,7 @@ function doctorLocalTime(instant, timezone) {
 function DoctorDashboard() {
   const [doctor, setDoctor] = useState(null);
   const [appointments, setAppointments] = useState([]);
+  const [appointmentSummary, setAppointmentSummary] = useState({ totalAppointments: 0, requestedAppointments: 0, acceptedAppointments: 0 });
   const [appointmentPage, setAppointmentPage] = useState(1);
   const [appointmentPages, setAppointmentPages] = useState(1);
   const [loadState, setLoadState] = useState('loading');
@@ -553,6 +554,10 @@ function DoctorDashboard() {
   const [savingAvailability, setSavingAvailability] = useState(false);
   const [availabilityError, setAvailabilityError] = useState('');
   const [availabilityConflicts, setAvailabilityConflicts] = useState([]);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileDraft, setProfileDraft] = useState({ specialty: '', bio: '', consultationFee: '' });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -563,6 +568,7 @@ function DoctorDashboard() {
         if (!active) return;
         setDoctor(data.doctor);
         setAppointments(data.appointments || []);
+        setAppointmentSummary(data.summary || { totalAppointments: data.pagination?.total || 0, requestedAppointments: 0, acceptedAppointments: 0 });
         setAppointmentPages(data.pagination?.pages || 1);
         setTimezone(data.doctor.timezone || 'Asia/Kolkata');
         setAvailability((data.doctor.availability || []).map((window) => ({ ...window })));
@@ -592,6 +598,35 @@ function DoctorDashboard() {
       setRefresh((value) => value + 1);
     } finally {
       setActionId('');
+    }
+  }
+
+  function beginProfileEdit() {
+    setProfileDraft({ specialty: doctor.specialty || '', bio: doctor.bio || '', consultationFee: String(doctor.consultationFee ?? '') });
+    setProfileError('');
+    setEditingProfile(true);
+  }
+
+  async function saveProfile(event) {
+    event.preventDefault();
+    setProfileError('');
+    const consultationFee = Number(profileDraft.consultationFee);
+    if (!profileDraft.specialty.trim() || profileDraft.specialty.trim().length > 80) return setProfileError('Specialty must be between 1 and 80 characters.');
+    if (!Number.isFinite(consultationFee) || consultationFee < 0 || consultationFee > 1000000) return setProfileError('Enter a consultation fee from ₹0 to ₹10,00,000.');
+    if (profileDraft.bio.length > 2000) return setProfileError('Biography must be 2000 characters or fewer.');
+    setSavingProfile(true);
+    setNotice('');
+    try {
+      const response = await apiRequest('/doctor/me/profile', { method: 'PATCH', body: JSON.stringify({
+        specialty: profileDraft.specialty.trim(), bio: profileDraft.bio.trim(), consultationFee,
+      }) });
+      setDoctor(response.doctor);
+      setEditingProfile(false);
+      setNotice('Your public profile has been updated.');
+    } catch (error) {
+      setProfileError(formatApiError(error));
+    } finally {
+      setSavingProfile(false);
     }
   }
 
@@ -663,9 +698,6 @@ function DoctorDashboard() {
     setAvailabilityConflicts([]);
   }
 
-  const requestedCount = appointments.filter((appointment) => appointment.status === 'requested').length;
-  const acceptedCount = appointments.filter((appointment) => appointment.status === 'accepted').length;
-
   return (
     <section className="doctor-dashboard-page">
       <div className="dashboard-heading doctor-dashboard-heading">
@@ -683,10 +715,21 @@ function DoctorDashboard() {
       {loadState === 'ready' && doctor && (
         <>
           <div className="doctor-stat-grid">
-            <article className="doctor-stat"><span className="stat-symbol">◷</span><div><small>All appointments</small><strong>{appointments.length}</strong></div></article>
-            <article className="doctor-stat"><span className="stat-symbol stat-pending">…</span><div><small>Awaiting your response</small><strong>{requestedCount}</strong></div></article>
-            <article className="doctor-stat"><span className="stat-symbol stat-confirmed">✓</span><div><small>Accepted visits</small><strong>{acceptedCount}</strong></div></article>
+            <article className="doctor-stat"><span className="stat-symbol">◷</span><div><small>All appointments</small><strong>{appointmentSummary.totalAppointments}</strong></div></article>
+            <article className="doctor-stat"><span className="stat-symbol stat-pending">…</span><div><small>Awaiting your response</small><strong>{appointmentSummary.requestedAppointments}</strong></div></article>
+            <article className="doctor-stat"><span className="stat-symbol stat-confirmed">✓</span><div><small>Accepted visits</small><strong>{appointmentSummary.acceptedAppointments}</strong></div></article>
           </div>
+
+          <section className="availability-panel doctor-profile-editor" aria-labelledby="doctor-profile-title">
+            <div className="doctor-panel-heading"><div><p className="eyebrow">PUBLIC DIRECTORY DETAILS</p><h2 id="doctor-profile-title">Your profile</h2></div><button className="button button-outline" type="button" onClick={editingProfile ? () => setEditingProfile(false) : beginProfileEdit}>{editingProfile ? 'Cancel editing' : 'Edit profile'}</button></div>
+            {!editingProfile && <div className="doctor-profile-summary"><strong>Dr. {doctor.name}</strong><span>{doctor.specialty} · ₹{Number(doctor.consultationFee).toLocaleString('en-IN')} consultation</span><p>{doctor.bio || 'No biography added.'}</p></div>}
+            {editingProfile && <form onSubmit={saveProfile}>
+              <div className="admin-form-grid"><label className="field">Specialty<input value={profileDraft.specialty} maxLength={80} onChange={(event) => setProfileDraft({ ...profileDraft, specialty: event.target.value })} required /></label><label className="field">Consultation fee (₹)<input type="number" min="0" max="1000000" step="1" value={profileDraft.consultationFee} onChange={(event) => setProfileDraft({ ...profileDraft, consultationFee: event.target.value })} required /></label></div>
+              <label className="field">Biography<textarea rows="3" maxLength={2000} value={profileDraft.bio} onChange={(event) => setProfileDraft({ ...profileDraft, bio: event.target.value })} /></label>
+              {profileError && <p className="form-error" role="alert">{profileError}</p>}
+              <button className="button button-primary" type="submit" disabled={savingProfile}>{savingProfile ? 'Saving profile…' : 'Save profile'}</button>
+            </form>}
+          </section>
 
           <div className="doctor-workspace-grid">
             <section className="doctor-appointments-panel" aria-labelledby="doctor-appointments-title">
@@ -697,6 +740,7 @@ function DoctorDashboard() {
                   <div className="doctor-appointment-top"><div><span className="appointment-kicker">{doctorLocalDate(appointment.startsAt, doctor.timezone)}</span><h3>{appointment.patient?.name || 'Patient'}</h3></div><span className={`status-badge status-${appointment.status}`}>{appointment.status}</span></div>
                   <div className="doctor-appointment-meta"><span>{doctorLocalTime(appointment.startsAt, doctor.timezone)} – {doctorLocalTime(appointment.endsAt, doctor.timezone)} · {doctor.timezone}</span>{appointment.reason && <p>{appointment.reason}</p>}</div>
                   {appointment.status === 'requested' && <div className="doctor-appointment-actions"><button className="button button-accept" type="button" disabled={actionId === appointment.id} onClick={() => changeAppointmentStatus(appointment, 'accepted')}>{actionId === appointment.id ? 'Saving…' : 'Accept request'}</button><button className="button button-reject" type="button" disabled={actionId === appointment.id} onClick={() => changeAppointmentStatus(appointment, 'rejected')}>Reject</button></div>}
+                  {appointment.status === 'accepted' && <div className="doctor-appointment-actions"><button className="button button-accept" type="button" disabled={actionId === appointment.id} onClick={() => changeAppointmentStatus(appointment, 'completed')}>{actionId === appointment.id ? 'Saving…' : 'Mark completed'}</button></div>}
                 </article>
               ))}</div>}
               {appointmentPages > 1 && <div className="doctor-pagination"><button className="button button-outline" type="button" disabled={appointmentPage <= 1} onClick={() => setAppointmentPage((page) => page - 1)}>← Previous</button><span>Page {appointmentPage} of {appointmentPages}</span><button className="button button-outline" type="button" disabled={appointmentPage >= appointmentPages} onClick={() => setAppointmentPage((page) => page + 1)}>Next →</button></div>}

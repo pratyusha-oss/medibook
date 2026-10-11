@@ -184,19 +184,23 @@ export function createDoctorDashboardService({ Doctor, Appointment, clock = () =
     const { page, limit, status } = pagination;
     const filter = { doctor: doctor._id };
     if (status) filter.status = status;
-    const [appointments, total] = await Promise.all([
+    const [appointments, total, requestedAppointments, acceptedAppointments, totalAppointments] = await Promise.all([
       Appointment.find(filter)
         .populate({ path: 'patient', select: 'name' })
         .sort({ startsAt: 1, _id: 1 })
         .skip((page - 1) * limit)
         .limit(limit),
       Appointment.countDocuments(filter),
+      Appointment.countDocuments({ doctor: doctor._id, status: 'requested' }),
+      Appointment.countDocuments({ doctor: doctor._id, status: 'accepted' }),
+      Appointment.countDocuments({ doctor: doctor._id }),
     ]);
 
     return {
       doctor: doctorDto(doctor),
       appointments: appointments.map(appointmentDto),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      summary: { totalAppointments, requestedAppointments, acceptedAppointments },
     };
   }
 
@@ -204,15 +208,16 @@ export function createDoctorDashboardService({ Doctor, Appointment, clock = () =
     const doctor = await findDoctorForUser(userId);
     parseAppointmentId(appointmentId);
     const status = input?.status;
-    if (status !== 'accepted' && status !== 'rejected') {
-      throw new DoctorDashboardError(400, 'INVALID_STATUS', 'status must be accepted or rejected');
+    if (!['accepted', 'rejected', 'completed'].includes(status)) {
+      throw new DoctorDashboardError(400, 'INVALID_STATUS', 'status must be accepted, rejected, or completed');
     }
 
-    const update = status === 'rejected'
+    const currentStatus = status === 'completed' ? 'accepted' : 'requested';
+    const update = status === 'rejected' || status === 'completed'
       ? { $set: { status }, $unset: { activeSlotKey: 1 } }
       : { $set: { status } };
     const updated = await Appointment.findOneAndUpdate(
-      { _id: appointmentId, doctor: doctor._id, status: 'requested' },
+      { _id: appointmentId, doctor: doctor._id, status: currentStatus },
       update,
       { new: true, runValidators: true },
     ).populate({ path: 'patient', select: 'name' });
@@ -224,6 +229,38 @@ export function createDoctorDashboardService({ Doctor, Appointment, clock = () =
       throw new DoctorDashboardError(404, 'APPOINTMENT_NOT_FOUND', 'Appointment not found');
     }
     throw new DoctorDashboardError(409, 'INVALID_STATUS_TRANSITION', `A ${existing.status} appointment cannot be changed by this action`);
+  }
+
+  async function updateProfile(userId, input = {}) {
+    const doctor = await findDoctorForUser(userId);
+    const allowed = new Set(['specialty', 'bio', 'consultationFee']);
+    const fields = Object.keys(input);
+    if (!fields.length || fields.some((field) => !allowed.has(field))) {
+      throw new DoctorDashboardError(400, 'INVALID_PROFILE', 'Only specialty, bio, and consultationFee can be updated');
+    }
+    const update = {};
+    if (Object.hasOwn(input, 'specialty')) {
+      if (typeof input.specialty !== 'string' || !input.specialty.trim() || input.specialty.trim().length > 80) {
+        throw new DoctorDashboardError(400, 'INVALID_PROFILE', 'specialty must be between 1 and 80 characters');
+      }
+      update.specialty = input.specialty.trim();
+    }
+    if (Object.hasOwn(input, 'bio')) {
+      if (typeof input.bio !== 'string' || input.bio.length > 2000) {
+        throw new DoctorDashboardError(400, 'INVALID_PROFILE', 'bio must be 2000 characters or fewer');
+      }
+      update.bio = input.bio.trim();
+    }
+    if (Object.hasOwn(input, 'consultationFee')) {
+      if (typeof input.consultationFee !== 'number' || !Number.isFinite(input.consultationFee) || input.consultationFee < 0 || input.consultationFee > 1000000) {
+        throw new DoctorDashboardError(400, 'INVALID_PROFILE', 'consultationFee must be a number between 0 and 1000000');
+      }
+      update.consultationFee = input.consultationFee;
+    }
+    const updated = await Doctor.findByIdAndUpdate(doctor._id, { $set: update }, { new: true, runValidators: true })
+      .populate({ path: 'user', select: 'name role isActive' });
+    if (!updated) throw new DoctorDashboardError(404, 'DOCTOR_PROFILE_NOT_FOUND', 'Doctor profile not found');
+    return { doctor: doctorDto(updated) };
   }
 
   async function updateAvailability(userId, input) {
@@ -262,5 +299,5 @@ export function createDoctorDashboardService({ Doctor, Appointment, clock = () =
     return { doctor: doctorDto(updated) };
   }
 
-  return { getProfile, listAppointments, updateAppointmentStatus, updateAvailability };
+  return { getProfile, listAppointments, updateAppointmentStatus, updateProfile, updateAvailability };
 }

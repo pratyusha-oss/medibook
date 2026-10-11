@@ -9,7 +9,7 @@ The API uses JSON under `/api`. Errors use `{ "error": { "code": "...", "message
 | Doctors | `GET /api/doctors`, `GET /api/doctors/:id` | Public reads; implemented |
 | Doctor slots | `GET /api/doctors/:doctorId/slots` | Public; implemented |
 | Patient appointments | `POST /api/appointments`, `GET /api/appointments/me`, `PATCH /api/appointments/:id/cancel` | Patient role; implemented |
-| Doctor profile and availability | `GET /api/doctor/me`, `PUT /api/doctor/me/availability` | Doctor role; implemented |
+| Doctor profile and availability | `GET /api/doctor/me`, `PATCH /api/doctor/me/profile`, `PUT /api/doctor/me/availability` | Doctor role; implemented |
 | Doctor appointment management | `GET /api/doctor/appointments`, `PATCH /api/doctor/appointments/:id/status` | Doctor role; implemented |
 | Admin management | `GET /api/admin/stats`, `GET /api/admin/appointments`, `GET /api/admin/users`, `PATCH /api/admin/users/:userId/status`, doctor list/create/edit/status endpoints | Admin role; implemented |
 
@@ -44,8 +44,9 @@ An active booking reserves `${doctorId}:${startsAt.toISOString()}` in the unique
 All `/api/doctor/*` endpoints require a Bearer token for an active doctor account. The server resolves the Doctor profile through the authenticated user's `User` ID; clients never submit a doctor ID for dashboard authorization.
 
 - `GET /api/doctor/me` returns `{ "doctor": { "id", "name", "specialty", "consultationFee", "bio", "timezone", "availability" } }`.
-- `GET /api/doctor/appointments?page=1&limit=50&status=requested` returns only appointments linked to that doctor's profile, with patient name, reason, status, and UTC start/end instants; the response includes the doctor's timezone for display. `status` is optional and supports the existing appointment statuses.
-- `PATCH /api/doctor/appointments/:id/status` accepts `{ "status": "accepted" }` or `{ "status": "rejected" }`. Only `requested` appointments can transition. Other doctors' appointment IDs return `404`; already changed appointments return `409 INVALID_STATUS_TRANSITION`. Rejection atomically clears `activeSlotKey` so the slot can become available again.
+- `GET /api/doctor/appointments?page=1&limit=50&status=requested` returns only appointments linked to that doctor's profile, with patient name, reason, status, and UTC start/end instants; the response includes the doctor's timezone for display. `status` is optional and supports the existing appointment statuses. `pagination.total` counts all matching database records, while `summary` contains all-time counts for that doctor's total, requested, and accepted appointments regardless of page.
+- `PATCH /api/doctor/appointments/:id/status` accepts `{ "status": "accepted" }`, `{ "status": "rejected" }`, or `{ "status": "completed" }`. Requested appointments can be accepted or rejected; accepted appointments can be completed. Other doctors' appointment IDs return `404`; ineligible transitions return `409 INVALID_STATUS_TRANSITION`. Rejection and completion atomically clear `activeSlotKey`.
+- `PATCH /api/doctor/me/profile` accepts any supported subset of `{ "specialty", "bio", "consultationFee" }`. Unknown fields, including account role and linked-user fields, are rejected. Updates apply only to the authenticated doctor's linked Doctor profile; account identity and appointment history are not changed.
 - `PUT /api/doctor/me/availability` accepts `{ "timezone": "Asia/Kolkata", "availability": [{ "weekday": 1, "startTime": "09:00", "endTime": "12:00" }] }`. Weekdays use `0` for Sunday through `6` for Saturday; times use local 24-hour `HH:mm`. Multiple non-overlapping windows per day are supported.
 - Invalid timezone, weekday, clock values, ordering, or overlapping windows return `400 INVALID_AVAILABILITY`. If a change would exclude a future requested or accepted appointment, the API returns `409 AVAILABILITY_CONFLICT` with the affected appointment IDs, UTC start times, patient names, and statuses. No changes are saved. Cancelled and rejected appointments do not constrain the schedule.
 
