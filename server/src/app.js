@@ -3,6 +3,7 @@ import express from 'express';
 import authRouter from './routes/auth.js';
 import doctorsRouter from './routes/doctors.js';
 import appointmentsRouter from './routes/appointments.js';
+import doctorDashboardRouter from './routes/doctorDashboard.js';
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/doctors', doctorsRouter);
 app.use('/api/appointments', appointmentsRouter);
+app.use('/api/doctor', doctorDashboardRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found' } });
@@ -37,7 +39,9 @@ app.use((err, _req, res, _next) => {
     ? err.message
     : 'Something went wrong';
   if (status >= 500) console.error(err);
-  res.status(status).json({ error: { code, message } });
+  const error = { code, message };
+  if (status < 500 && err.name === 'DoctorDashboardError' && err.details !== undefined) error.details = err.details;
+  res.status(status).json({ error });
 });
 
 export default app;

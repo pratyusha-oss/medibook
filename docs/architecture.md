@@ -15,3 +15,9 @@ Availability is stored as weekly local-time windows in the doctor's IANA timezon
 Public registration creates patient accounts only; doctor and admin roles cannot be selected in a signup request. Passwords are hashed with bcryptjs, and the database field is excluded from normal query results. Access tokens are signed with a server-only secret and expire after seven days. Protected requests verify the token and load the current active account from MongoDB, so role changes and account deactivation take effect without waiting for the token to expire. Role middleware checks permissions on the server; the frontend is not trusted to enforce access.
 
 Request bodies are validated before database writes, JSON input size is limited, and CORS uses the configured client origin. Secrets belong in server-side environment variables, never in the client bundle or Git.
+
+## Doctor workspace
+
+Doctor dashboard routes require an authenticated doctor role and resolve the Doctor profile from the token's current User ID. Appointment list and status queries include that linked profile ID, so a doctor cannot read or change another doctor's records. Status transitions are atomic and only accept or reject a `requested` appointment; rejection releases the active slot key.
+
+Weekly availability edits validate IANA timezone names and local weekly windows, including overlap checks. Before saving, the API checks all future requested and accepted appointments against the proposed schedule. Conflicting updates return the affected appointments and leave the existing schedule untouched. Public slot generation continues to read the saved local availability and convert slot instants to UTC.

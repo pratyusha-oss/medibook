@@ -2,11 +2,12 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:500
 const TOKEN_KEY = 'medibook.accessToken';
 
 export class ApiError extends Error {
-  constructor(message, status, code) {
+  constructor(message, status, code, details) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -42,7 +43,7 @@ export async function apiRequest(path, options = {}) {
   const payload = contentType.includes('application/json') ? await response.json().catch(() => null) : null;
   if (!response.ok) {
     const error = payload?.error || {};
-    throw new ApiError(error.message || `Request failed (${response.status})`, response.status, error.code || 'REQUEST_FAILED');
+    throw new ApiError(error.message || `Request failed (${response.status})`, response.status, error.code || 'REQUEST_FAILED', error.details);
   }
   return payload;
 }
@@ -51,7 +52,8 @@ export function formatApiError(error) {
   if (error instanceof ApiError) {
     if (error.status === 409 && error.code === 'EMAIL_IN_USE') return 'An account with this email already exists. Try signing in instead.';
     if (error.status === 401 && error.code === 'INVALID_CREDENTIALS') return 'That email and password do not match. Please try again.';
-    if (error.status === 409) return 'That appointment slot was just taken. We refreshed availability; please choose another time.';
+    if (error.status === 409 && error.code === 'AVAILABILITY_CONFLICT') return error.message;
+    if (error.status === 409 && ['SLOT_UNAVAILABLE', 'BOOKING_CONFLICT'].includes(error.code)) return 'That appointment slot was just taken. We refreshed availability; please choose another time.';
     if (error.status === 0) return error.message;
     return error.message;
   }

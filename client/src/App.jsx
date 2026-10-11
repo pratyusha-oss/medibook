@@ -312,6 +312,7 @@ function App() {
   }
 
   const isAppointments = activePage === 'appointments';
+  const isDoctorDashboard = activePage === 'doctor-dashboard';
 
   return (
     <div className="app-shell">
@@ -322,8 +323,9 @@ function App() {
             <span>MediBook</span>
           </button>
           <nav className="main-nav" aria-label="Main navigation">
-            <button className={!isAppointments && activePage !== 'doctor' ? 'nav-link active' : 'nav-link'} type="button" onClick={showDirectory}>Find care</button>
+            <button className={!isAppointments && !isDoctorDashboard && activePage !== 'doctor' ? 'nav-link active' : 'nav-link'} type="button" onClick={showDirectory}>Find care</button>
             {user?.role === 'patient' && <button className={isAppointments ? 'nav-link active' : 'nav-link'} type="button" onClick={showAppointments}>My appointments</button>}
+            {user?.role === 'doctor' && <button className={isDoctorDashboard ? 'nav-link active' : 'nav-link'} type="button" onClick={() => { setActivePage('doctor-dashboard'); setAuthMode(null); }}>Doctor dashboard</button>}
           </nav>
           <div className="account-actions">
             {user ? (
@@ -485,6 +487,8 @@ function App() {
             })}</div>}
           </section>
         )}
+
+        {!authMode && isDoctorDashboard && user?.role === 'doctor' && <DoctorDashboard />}
       </main>
       <footer className="site-footer"><div><a className="brand footer-brand" href="#top" onClick={(event) => { event.preventDefault(); showDirectory(); }}><span className="brand-mark" aria-hidden="true">+</span><span>MediBook</span></a><span>Thoughtful care, one appointment at a time.</span></div><span>Made for better days.</span></footer>
     </div>
@@ -502,6 +506,225 @@ function DoctorCard({ doctor, index, onOpen }) {
     <p className="doctor-bio">{doctor.bio || 'A compassionate professional, ready to listen and help you feel your best.'}</p>
     <div className="doctor-card-bottom"><div className="fee-display"><small>Consultation</small><strong>₹{Number(doctor.consultationFee).toLocaleString('en-IN')}</strong></div><button className="button button-card" type="button" onClick={onOpen}>View profile <span aria-hidden="true">↗</span></button></div>
   </article>;
+}
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const AVAILABLE_TIMEZONES = typeof Intl.supportedValuesOf === 'function'
+  ? Intl.supportedValuesOf('timeZone')
+  : ['Asia/Kolkata', 'UTC'];
+
+function doctorLocalDate(instant, timezone) {
+  return new Intl.DateTimeFormat(undefined, {
+    timeZone: timezone,
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(instant));
+}
+
+function doctorLocalTime(instant, timezone) {
+  return new Intl.DateTimeFormat(undefined, {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(instant));
+}
+
+function DoctorDashboard() {
+  const [doctor, setDoctor] = useState(null);
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentPage, setAppointmentPage] = useState(1);
+  const [appointmentPages, setAppointmentPages] = useState(1);
+  const [loadState, setLoadState] = useState('loading');
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [actionId, setActionId] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  const [timezone, setTimezone] = useState('Asia/Kolkata');
+  const [availability, setAvailability] = useState([]);
+  const [savingAvailability, setSavingAvailability] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState('');
+  const [availabilityConflicts, setAvailabilityConflicts] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    setLoadState('loading');
+    setLoadError('');
+    apiRequest(`/doctor/appointments?page=${appointmentPage}&limit=50`)
+      .then((data) => {
+        if (!active) return;
+        setDoctor(data.doctor);
+        setAppointments(data.appointments || []);
+        setAppointmentPages(data.pagination?.pages || 1);
+        setTimezone(data.doctor.timezone || 'Asia/Kolkata');
+        setAvailability((data.doctor.availability || []).map((window) => ({ ...window })));
+        setLoadState('ready');
+      })
+      .catch((error) => {
+        if (!active) return;
+        setLoadError(formatApiError(error));
+        setLoadState('error');
+      });
+    return () => { active = false; };
+  }, [refresh, appointmentPage]);
+
+  async function changeAppointmentStatus(appointment, status) {
+    setActionId(appointment.id);
+    setNotice('');
+    setActionError('');
+    try {
+      await apiRequest(`/doctor/appointments/${encodeURIComponent(appointment.id)}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+      setNotice(`Appointment ${status}.`);
+      setRefresh((value) => value + 1);
+    } catch (error) {
+      setActionError(formatApiError(error));
+      setRefresh((value) => value + 1);
+    } finally {
+      setActionId('');
+    }
+  }
+
+  function validateAvailabilityForm() {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+    } catch {
+      return 'Enter a valid IANA timezone, such as Asia/Kolkata.';
+    }
+    for (const [index, window] of availability.entries()) {
+      if (!Number.isInteger(Number(window.weekday)) || Number(window.weekday) < 0 || Number(window.weekday) > 6) {
+        return `Choose a valid weekday for working window ${index + 1}.`;
+      }
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(window.startTime) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(window.endTime)) {
+        return `Use 24-hour HH:mm times for working window ${index + 1}.`;
+      }
+      if (window.startTime >= window.endTime) return `Window ${index + 1} must end after it starts.`;
+    }
+    const byDay = new Map();
+    for (const window of availability) {
+      const day = Number(window.weekday);
+      const windows = byDay.get(day) || [];
+      windows.push(window);
+      byDay.set(day, windows);
+    }
+    for (const windows of byDay.values()) {
+      windows.sort((left, right) => left.startTime.localeCompare(right.startTime));
+      for (let index = 1; index < windows.length; index += 1) {
+        if (windows[index].startTime < windows[index - 1].endTime) return 'Working windows on the same day cannot overlap.';
+      }
+    }
+    return '';
+  }
+
+  async function saveAvailability(event) {
+    event.preventDefault();
+    setAvailabilityError(validateAvailabilityForm());
+    setAvailabilityConflicts([]);
+    setNotice('');
+    if (validateAvailabilityForm()) return;
+    setSavingAvailability(true);
+    try {
+      const response = await apiRequest('/doctor/me/availability', {
+        method: 'PUT',
+        body: JSON.stringify({
+          timezone: timezone.trim(),
+          availability: availability.map(({ weekday, startTime, endTime }) => ({
+            weekday: Number(weekday), startTime, endTime,
+          })),
+        }),
+      });
+      setDoctor(response.doctor);
+      setTimezone(response.doctor.timezone);
+      setAvailability(response.doctor.availability || []);
+      setAvailabilityError('');
+      setAvailabilityConflicts([]);
+      setNotice('Weekly availability saved. Public booking slots now use this schedule.');
+    } catch (error) {
+      setAvailabilityError(formatApiError(error));
+      setAvailabilityConflicts(error.details?.appointments || []);
+    } finally {
+      setSavingAvailability(false);
+    }
+  }
+
+  function editWindow(index, field, value) {
+    setAvailability((current) => current.map((window, rowIndex) => rowIndex === index ? { ...window, [field]: value } : window));
+    setAvailabilityError('');
+    setAvailabilityConflicts([]);
+  }
+
+  const requestedCount = appointments.filter((appointment) => appointment.status === 'requested').length;
+  const acceptedCount = appointments.filter((appointment) => appointment.status === 'accepted').length;
+
+  return (
+    <section className="doctor-dashboard-page">
+      <div className="dashboard-heading doctor-dashboard-heading">
+        <div><p className="eyebrow">YOUR PRACTICE, AT A GLANCE</p><h1>Doctor dashboard</h1><p className="muted">{doctor ? `Welcome, ${doctor.name}. Manage your visits and weekly hours.` : 'Manage your visits and weekly hours.'}</p></div>
+        <button className="button button-outline" type="button" onClick={() => setRefresh((value) => value + 1)} disabled={loadState === 'loading'}>Refresh dashboard ↻</button>
+      </div>
+
+      {notice && <div className="doctor-success" role="status"><span>✓</span>{notice}</div>}
+      {loadError && loadState !== 'error' && <div className="inline-error" role="alert">{loadError}</div>}
+      {actionError && <div className="inline-error" role="alert">{actionError}</div>}
+
+      {loadState === 'loading' && <div className="state-panel" role="status"><span className="spinner" /> Loading your doctor workspace…</div>}
+      {loadState === 'error' && <div className="state-panel state-error" role="alert"><strong>We couldn’t load your doctor workspace.</strong><span>{loadError}</span><button className="button button-outline" type="button" onClick={() => setRefresh((value) => value + 1)}>Try again</button></div>}
+
+      {loadState === 'ready' && doctor && (
+        <>
+          <div className="doctor-stat-grid">
+            <article className="doctor-stat"><span className="stat-symbol">◷</span><div><small>All appointments</small><strong>{appointments.length}</strong></div></article>
+            <article className="doctor-stat"><span className="stat-symbol stat-pending">…</span><div><small>Awaiting your response</small><strong>{requestedCount}</strong></div></article>
+            <article className="doctor-stat"><span className="stat-symbol stat-confirmed">✓</span><div><small>Accepted visits</small><strong>{acceptedCount}</strong></div></article>
+          </div>
+
+          <div className="doctor-workspace-grid">
+            <section className="doctor-appointments-panel" aria-labelledby="doctor-appointments-title">
+              <div className="doctor-panel-heading"><div><p className="eyebrow">PATIENT VISITS</p><h2 id="doctor-appointments-title">Appointments</h2></div><span className="panel-timezone">{doctor.timezone}</span></div>
+              {appointments.length === 0 && <div className="doctor-empty"><span>✳</span><strong>No appointments yet</strong><p>New patient requests will appear here.</p></div>}
+              {appointments.length > 0 && <div className="doctor-appointment-list">{appointments.map((appointment) => (
+                <article className="doctor-appointment-card" key={appointment.id}>
+                  <div className="doctor-appointment-top"><div><span className="appointment-kicker">{doctorLocalDate(appointment.startsAt, doctor.timezone)}</span><h3>{appointment.patient?.name || 'Patient'}</h3></div><span className={`status-badge status-${appointment.status}`}>{appointment.status}</span></div>
+                  <div className="doctor-appointment-meta"><span>{doctorLocalTime(appointment.startsAt, doctor.timezone)} – {doctorLocalTime(appointment.endsAt, doctor.timezone)} · {doctor.timezone}</span>{appointment.reason && <p>{appointment.reason}</p>}</div>
+                  {appointment.status === 'requested' && <div className="doctor-appointment-actions"><button className="button button-accept" type="button" disabled={actionId === appointment.id} onClick={() => changeAppointmentStatus(appointment, 'accepted')}>{actionId === appointment.id ? 'Saving…' : 'Accept request'}</button><button className="button button-reject" type="button" disabled={actionId === appointment.id} onClick={() => changeAppointmentStatus(appointment, 'rejected')}>Reject</button></div>}
+                </article>
+              ))}</div>}
+              {appointmentPages > 1 && <div className="doctor-pagination"><button className="button button-outline" type="button" disabled={appointmentPage <= 1} onClick={() => setAppointmentPage((page) => page - 1)}>← Previous</button><span>Page {appointmentPage} of {appointmentPages}</span><button className="button button-outline" type="button" disabled={appointmentPage >= appointmentPages} onClick={() => setAppointmentPage((page) => page + 1)}>Next →</button></div>}
+            </section>
+
+            <section className="availability-panel" aria-labelledby="availability-title">
+              <div className="doctor-panel-heading"><div><p className="eyebrow">SET YOUR HOURS</p><h2 id="availability-title">Weekly availability</h2></div><span className="availability-clock">◷</span></div>
+              <p className="muted">Your local hours generate 30-minute booking slots. Booked appointments stay in place.</p>
+              <form onSubmit={saveAvailability}>
+                <label className="field">Time zone (IANA identifier)
+                  <input list="timezone-options" value={timezone} onChange={(event) => { setTimezone(event.target.value); setAvailabilityError(''); setAvailabilityConflicts([]); }} placeholder="Asia/Kolkata" required />
+                  <datalist id="timezone-options">{AVAILABLE_TIMEZONES.map((zone) => <option key={zone} value={zone} />)}</datalist>
+                </label>
+                <div className="availability-rows-heading"><span>Day and working hours</span><button type="button" className="add-window" onClick={() => setAvailability((current) => [...current, { weekday: 1, startTime: '09:00', endTime: '17:00' }])}>+ Add hours</button></div>
+                {availability.length === 0 && <div className="availability-no-hours">No hours set. Add a weekly window to make booking slots available.</div>}
+                <div className="availability-window-list">{availability.map((window, index) => (
+                  <div className="availability-window-row" key={`${index}-${window.weekday}-${window.startTime}`}>
+                    <label><span className="sr-only">Weekday</span><select aria-label={`Window ${index + 1} weekday`} value={window.weekday} onChange={(event) => editWindow(index, 'weekday', Number(event.target.value))}>{WEEKDAYS.map((day, weekday) => <option key={day} value={weekday}>{day}</option>)}</select></label>
+                    <label><span className="sr-only">Start time</span><input aria-label={`Window ${index + 1} start time`} type="time" value={window.startTime} onChange={(event) => editWindow(index, 'startTime', event.target.value)} /></label>
+                    <span className="window-separator">to</span>
+                    <label><span className="sr-only">End time</span><input aria-label={`Window ${index + 1} end time`} type="time" value={window.endTime} onChange={(event) => editWindow(index, 'endTime', event.target.value)} /></label>
+                    <button className="remove-window" type="button" aria-label={`Remove ${WEEKDAYS[window.weekday]} hours ${index + 1}`} onClick={() => { setAvailability((current) => current.filter((_, rowIndex) => rowIndex !== index)); setAvailabilityError(''); setAvailabilityConflicts([]); }}>×</button>
+                  </div>
+                ))}</div>
+                {availabilityError && <p className="form-error" role="alert">{availabilityError}</p>}
+                {availabilityConflicts.length > 0 && <div className="availability-conflicts" role="alert"><strong>These future appointments fall outside the proposed hours:</strong><ul>{availabilityConflicts.map((conflict) => <li key={conflict.id}>{conflict.patientName} · {doctorLocalDate(conflict.startsAt, timezone || doctor.timezone)} · {doctorLocalTime(conflict.startsAt, timezone || doctor.timezone)}</li>)}</ul><span>No availability was changed. Keep these times in your schedule or resolve the appointments first.</span></div>}
+                <button className="button button-primary button-full save-availability" type="submit" disabled={savingAvailability}>{savingAvailability ? 'Saving hours…' : 'Save weekly hours'}</button>
+              </form>
+            </section>
+          </div>
+        </>
+      )}
+    </section>
+  );
 }
 
 export default App;
