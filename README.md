@@ -10,10 +10,12 @@ Doctor appointment management system built with MongoDB, Express, React, and Nod
 
 ## Local setup
 
-1. Copy `server/.env.example` to `server/.env` and set `MONGODB_URI` and a private `JWT_SECRET`.
+1. Create `server/.env` with local-only values for `NODE_ENV=development`, `PORT=5000`, `MONGODB_URI=mongodb://127.0.0.1:27017/medibook`, `JWT_SECRET` (at least 32 characters), and `CLIENT_URL=http://localhost:5173`.
 2. Install dependencies from the repository root with `npm install`.
 3. Start the Vite client and API with `npm run dev`.
 4. Open the client URL printed by Vite. The API health endpoint is `http://localhost:5000/api/health`.
+
+The client uses `VITE_API_BASE_URL` at build time and defaults to the local API above. For a local override, set it in `client/.env.local`; this variable is public browser configuration and must never contain credentials or other secrets.
 
 The client and server are separate npm workspaces. The client is a Vite React single-page application; the server exposes JSON REST endpoints and connects to MongoDB through Mongoose.
 
@@ -38,7 +40,88 @@ The password must contain 8–72 UTF-8 bytes. Keep the variable set only for thi
 
 ## Environment variables
 
-See [`server/.env.example`](server/.env.example). Never commit `.env` files or place secrets in frontend variables; browser code is public.
+Never commit `.env` files or place secrets in frontend variables; browser code is public. The server reads the variables listed in the deployment section below. The optional local example [`client/.env.example`](client/.env.example) contains only the non-secret local API URL.
+
+## Deployment (Vercel, Render, MongoDB Atlas)
+
+Deploy the frontend as a Vercel project and the API as a Render **Web Service**. No deployment configuration file is required for the current URL behavior.
+
+### Vercel frontend settings
+
+Connect the repository and set:
+
+| Setting | Value |
+| --- | --- |
+| Root Directory | `.` (repository root; keep the root npm workspace lockfile in scope) |
+| Framework Preset | `Other` |
+| Install Command | `npm ci` |
+| Build Command | `npm run build` |
+| Output Directory | `client/dist` |
+| Node.js | `22.x` or another version satisfying the project minimum |
+
+Set `VITE_API_BASE_URL` in Vercel's **Production**, **Preview**, and **Development** environments as needed. Production should be the full Render API base URL, for example `https://<render-service>.onrender.com/api`. This value is compiled into the public JavaScript bundle; it is an API address, never a secret. Do not add `MONGODB_URI`, `JWT_SECRET`, bootstrap passwords, or any server secret to Vercel.
+
+The current React app changes views in component state and does not use pathname-based client routes. Therefore it does not need a Vercel SPA rewrite today. If direct links to client-side paths are added later, add a Vercel rewrite to `/index.html` and verify that it does not shadow static assets.
+
+### Render API settings
+
+Create a Node **Web Service** with:
+
+| Setting | Value |
+| --- | --- |
+| Root Directory | `.` (repository root; the API is an npm workspace) |
+| Build Command | `npm ci` |
+| Start Command | `npm start` |
+| Health Check Path | `/api/health` |
+| Node.js | `22.x` or another version satisfying the project minimum |
+
+The root `start` script delegates to `npm run start --workspace server`. The server listens on Render's injected `PORT`; do not set a fixed production port. Add these variables in the Render service's **Environment** settings:
+
+| Variable | Required value |
+| --- | --- |
+| `NODE_ENV` | `production` |
+| `MONGODB_URI` | Atlas application connection string for the production database; store as a Render secret |
+| `JWT_SECRET` | A high-entropy server-only secret of at least 32 characters; store as a Render secret |
+| `CLIENT_URL` | Exact HTTPS Vercel production origin, with no path or trailing slash; comma-separated additional exact HTTPS origins are supported if needed |
+
+`PORT` is supplied by Render. `CLIENT_URL` is required in production; startup now fails safely if it is missing or malformed. The server does not allow wildcard origins. Do not put bootstrap variables in the persistent Render environment.
+
+### MongoDB Atlas setup
+
+1. Use a production Atlas project/cluster and a database name dedicated to MediBook. Set the database name in the Atlas connection URI.
+2. Create a separate database user for the API with only `readWrite` access to the MediBook database. This is distinct from an Atlas console user. URL-encode special characters in the username/password portion of the URI.
+3. In Atlas **Network Access**, allow the Render service's outbound IP CIDR ranges for its region (shown in Render's service **Connect → Outbound** panel). Avoid `0.0.0.0/0`; use private networking or dedicated outbound IPs if you need a narrower allowlist.
+4. Save the connection string only as Render's `MONGODB_URI`. Keep the URI out of Git, Vercel variables, screenshots, and logs.
+
+Atlas requires both an IP access-list entry and a database user for the application connection. See the official [Atlas connection guide](https://www.mongodb.com/docs/atlas/connect-to-database-deployment/) and [Render outbound IP guide](https://render.com/docs/outbound-ip-addresses).
+
+### Deployment order and first admin
+
+1. Create the Atlas database user and network access entry.
+2. Create the Render service and Vercel project so their production origins are known. Configure the Render server variables and Vercel `VITE_API_BASE_URL` above.
+3. Deploy Render first, then verify `https://<render-service>.onrender.com/api/health` returns `{"status":"ok","service":"medibook-api"}`.
+4. Deploy Vercel. Verify the deployed UI can load the public doctor directory and that login/API requests use the Render URL.
+5. Only after confirming the Render `MONGODB_URI` targets the intended production database, provision the first admin once from a secured operator machine. Do not add bootstrap variables to Render or run the script as a build, pre-deploy, or start command. The script hashes the password and writes the admin plus a persistent one-time bootstrap marker.
+
+For the one-time production bootstrap, provide `MONGODB_URI` to the trusted process through your approved secret manager, then run this from the repository root in PowerShell. The password is prompted securely and the production opt-in exists only for that command:
+
+```powershell
+$env:NODE_ENV = 'production'
+$env:ADMIN_BOOTSTRAP_ALLOW_PRODUCTION = 'true'
+$env:ADMIN_BOOTSTRAP_PRODUCTION_CONFIRMATION = 'CREATE_FIRST_ADMIN_IN_PRODUCTION'
+$env:ADMIN_BOOTSTRAP_NAME = 'MediBook Administrator'
+$env:ADMIN_BOOTSTRAP_EMAIL = 'admin@example.com'
+$securePassword = Read-Host 'Initial admin password' -AsSecureString
+$env:ADMIN_BOOTSTRAP_PASSWORD = [System.Net.NetworkCredential]::new('', $securePassword).Password
+try {
+  npm run bootstrap:admin --workspace server
+} finally {
+  Remove-Item Env:NODE_ENV, Env:MONGODB_URI, Env:ADMIN_BOOTSTRAP_NAME, Env:ADMIN_BOOTSTRAP_EMAIL, Env:ADMIN_BOOTSTRAP_PASSWORD, Env:ADMIN_BOOTSTRAP_ALLOW_PRODUCTION, Env:ADMIN_BOOTSTRAP_PRODUCTION_CONFIRMATION -ErrorAction SilentlyContinue
+  Remove-Variable securePassword -ErrorAction SilentlyContinue
+}
+```
+
+Do not place the admin password or production opt-in values in source control, `.env`, Render's persistent environment, or Vercel. The bootstrap is one-time; do not repeat it after the marker has been written.
 
 ## Project layout
 

@@ -10,6 +10,8 @@ try {
   await connectToDatabase();
   app.listen(port, () => console.info(`MediBook API listening on port ${port}`));
 } catch (error) {
-  console.error('Server startup failed:', error.message);
+  console.error('Server startup failed; check environment configuration and MongoDB connectivity.', {
+    errorName: error?.name || 'Error',
+  });
   process.exitCode = 1;
 }

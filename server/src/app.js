@@ -5,12 +5,13 @@ import doctorsRouter from './routes/doctors.js';
 import appointmentsRouter from './routes/appointments.js';
 import doctorDashboardRouter from './routes/doctorDashboard.js';
 import adminRouter from './routes/admin.js';
+import { getAllowedClientOrigins } from './config/cors.js';
 
 const app = express();
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: getAllowedClientOrigins(),
   }),
 );
 app.use(express.json({ limit: '20kb' }));
@@ -40,7 +41,7 @@ app.use((err, _req, res, _next) => {
   const message = status < 500
     ? err.message
     : 'Something went wrong';
-  if (status >= 500) console.error(err);
+  if (status >= 500) console.error('Request failed', { errorName: err.name || 'Error' });
   const error = { code, message };
   if (status < 500 && ['DoctorDashboardError', 'AdminServiceError'].includes(err.name) && err.details !== undefined) error.details = err.details;
   res.status(status).json({ error });

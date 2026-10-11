@@ -18,7 +18,11 @@ The first admin is created by a one-time server script, never by public signup. 
 
 The admin service also provides database-backed counts by appointment status and paginated appointment and user lists. These responses are mapped to explicit display DTOs so password hashes and unrelated private fields are not returned. User status updates preserve future appointments, block self-deactivation, and reject deactivation of the last active admin. Doctor profile edits validate the supported profile fields; changing weekly availability or timezone reuses the same future-appointment conflict rule as doctor self-service edits.
 
-Request bodies are validated before database writes, JSON input size is limited, and CORS uses the configured client origin. Secrets belong in server-side environment variables, never in the client bundle or Git.
+Request bodies are validated before database writes, JSON input size is limited, and CORS uses an exact allowlist from `CLIENT_URL`. Local development defaults to `http://localhost:5173`; production requires explicit HTTPS origins and rejects wildcard, path, and credential-bearing origin values. Startup and request failures log only the error class, not raw database errors or credentials. Secrets belong in server-side environment variables, never in the client bundle or Git.
+
+## Deployment boundary
+
+The Vite client is built from the repository root workspace and emits `client/dist`. `VITE_API_BASE_URL` is public build-time configuration and points to the `/api` base URL. Render runs the Express workspace from the root lockfile and supplies the listening `PORT`. The API waits for MongoDB and model indexes before opening its HTTP port; the health endpoint is consequently available only after database startup succeeds. Atlas credentials and the JWT signing key are Render-only secrets. Atlas access is restricted to the Render service's outbound IP ranges or a private network path. The first-admin bootstrap is a separately invoked, one-time operator action, not part of the service lifecycle.
 
 ## Doctor workspace
 

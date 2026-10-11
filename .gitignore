@@ -3,7 +3,6 @@ dist/
 coverage/
 .env
 .env.*
-!.env
 /server/.env
 !/server/.env.example
 !/client/.env.example
