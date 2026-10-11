@@ -16,6 +16,8 @@ Public registration creates patient accounts only; doctor and admin roles cannot
 
 The first admin is created by a one-time server script, never by public signup. It requires a password through a short-lived process environment variable, hashes it with the same bcrypt mechanism, and atomically claims a persistent singleton bootstrap marker before checking that no admin exists. A production run additionally requires two deliberate opt-in values. Admin doctor routes create doctor-role users and linked doctor profiles; if profile creation fails after user creation, the service removes that just-created user to avoid an orphan login. Admin deactivation checks future requested and accepted appointments first and refuses the operation with a conflict response until they are resolved. The admin dashboard is hidden by role-aware navigation, while every operation remains protected by backend middleware.
 
+The admin service also provides database-backed counts by appointment status and paginated appointment and user lists. These responses are mapped to explicit display DTOs so password hashes and unrelated private fields are not returned. User status updates preserve future appointments, block self-deactivation, and reject deactivation of the last active admin. Doctor profile edits validate the supported profile fields; changing weekly availability or timezone reuses the same future-appointment conflict rule as doctor self-service edits.
+
 Request bodies are validated before database writes, JSON input size is limited, and CORS uses the configured client origin. Secrets belong in server-side environment variables, never in the client bundle or Git.
 
 ## Doctor workspace

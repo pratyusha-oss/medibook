@@ -162,6 +162,37 @@ a { color: inherit; }
 .admin-doctor-card span, .admin-doctor-card small { color: #89968d; font-size: .68rem; overflow-wrap: anywhere; }
 .admin-doctor-actions { display: flex; flex-direction: column; align-items: end; gap: 7px; flex: 0 0 auto; }
 .admin-doctor-actions .button { min-height: 32px; padding: 0 10px; font-size: .66rem; }
+.admin-tabs { display: flex; gap: 8px; overflow-x: auto; margin: 0 0 20px; border-bottom: 1px solid #e3ebe2; }
+.admin-tab { flex: 0 0 auto; border: 0; border-bottom: 2px solid transparent; padding: 11px 14px; background: transparent; color: #819087; font-size: .76rem; font-weight: 700; }
+.admin-tab:hover, .admin-tab:focus-visible { color: #3f7052; }
+.admin-tab.active { border-color: #5d956d; color: #3f7052; }
+.admin-dashboard-content { display: grid; gap: 20px; }
+.admin-stat-grid { margin: 0 0 18px; }
+.admin-status-summary { padding: 20px; }
+.admin-status-summary h3 { margin: 0; color: #445e4d; font-family: var(--serif); font-size: 1.45rem; font-weight: 400; }
+.admin-status-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.admin-status-grid article { display: flex; flex-direction: column; align-items: flex-start; gap: 11px; border: 1px solid #e8eee7; border-radius: 10px; padding: 12px; }
+.admin-status-grid article > strong { color: #435d4a; font-size: 1.4rem; }
+.admin-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; margin: 0 0 15px; border: 1px solid #e7ece6; border-radius: 11px; padding: 12px; background: #fff; }
+.admin-filters .field { min-width: 135px; flex: 1 1 150px; margin: 0; }
+.admin-filters .button { min-height: 41px; }
+.admin-search { display: flex; flex: 1 1 260px; align-items: end; gap: 8px; }
+.admin-search .field { min-width: 180px; flex: 1; }
+.admin-appointment-filters .field { flex-basis: 150px; }
+.admin-table-wrap { overflow-x: auto; border: 1px solid #e5ebe4; border-radius: 12px; background: #fff; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: .75rem; text-align: left; }
+.admin-table th, .admin-table td { min-width: 105px; border-bottom: 1px solid #edf0eb; padding: 12px 14px; vertical-align: middle; }
+.admin-table th { background: #f7f9f5; color: #77867d; font-size: .64rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.admin-table td { color: #65756a; }
+.admin-table td:first-child { min-width: 165px; }
+.admin-table td strong, .admin-table td small { display: block; }
+.admin-table td strong { color: #425b4b; }
+.admin-table td small { margin-top: 4px; color: #8d9990; font-size: .67rem; }
+.admin-table tr:last-child td { border-bottom: 0; }
+.admin-table .button { min-height: 34px; padding-inline: 10px; font-size: .67rem; white-space: nowrap; }
+.admin-inline-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin-pagination { margin-top: 15px; }
+.admin-helper-text { color: #89958d; font-size: .7rem; }
 .doctor-dashboard-heading { margin-bottom: 27px; }
 .doctor-dashboard-heading h1 { font-size: clamp(2.8rem, 5vw, 4.2rem); }
 .doctor-success { display: flex; align-items: center; gap: 9px; margin: 0 0 18px; border: 1px solid #d5e6d7; border-radius: 9px; padding: 12px 14px; background: #f1f7ef; color: #547a5b; font-size: .78rem; }
@@ -193,5 +224,5 @@ a { color: inherit; }
 }
 @media (max-width: 720px) {
   .doctor-dashboard-page { padding: 40px 0 65px; }.doctor-stat-grid { grid-template-columns: 1fr; gap: 8px; }.doctor-stat { padding: 12px 14px; }.doctor-stat .stat-symbol { width: 35px; height: 35px; }.doctor-appointments-panel, .availability-panel { padding: 17px; }.doctor-dashboard-heading { align-items: flex-start; }.availability-window-row { grid-template-columns: minmax(82px, 1fr) minmax(75px, .8fr) 12px minmax(75px, .8fr) 22px; gap: 3px; }.availability-window-row select, .availability-window-row input { padding-inline: 4px; font-size: .62rem; }.doctor-appointment-top { align-items: start; }
-  .admin-workspace-grid { grid-template-columns: 1fr; }.admin-form-grid { grid-template-columns: 1fr; }.admin-doctor-card { align-items: flex-start; }.admin-doctor-actions { align-items: flex-end; }
+  .admin-workspace-grid { grid-template-columns: 1fr; }.admin-form-grid { grid-template-columns: 1fr; }.admin-doctor-card { align-items: flex-start; }.admin-doctor-actions { align-items: flex-end; }.admin-tabs { margin-inline: -3px; }.admin-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.admin-table { min-width: 720px; }.admin-filters { align-items: stretch; }.admin-search { flex-basis: 100%; }
 }

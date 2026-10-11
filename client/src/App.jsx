@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest, clearToken, formatApiError, saveToken } from './api.js';
+import AdminDashboard from './AdminDashboard.jsx';
 
 const EMPTY_PAGINATION = { page: 1, limit: 12, total: 0, pages: 0 };
 
@@ -492,7 +493,7 @@ function App() {
         )}
 
         {!authMode && isDoctorDashboard && user?.role === 'doctor' && <DoctorDashboard />}
-        {!authMode && isAdminDashboard && user?.role === 'admin' && <AdminDashboard />}
+        {!authMode && isAdminDashboard && user?.role === 'admin' && <AdminDashboard user={user} />}
         {!authMode && isAdminDashboard && user?.role !== 'admin' && <section className="appointments-page"><div className="state-panel state-error" role="alert"><strong>Admin access required.</strong><span>This workspace is available only to an authenticated admin account.</span><button className="button button-outline" type="button" onClick={showDirectory}>Return to doctor directory</button></div></section>}
       </main>
       <footer className="site-footer"><div><a className="brand footer-brand" href="#top" onClick={(event) => { event.preventDefault(); showDirectory(); }}><span className="brand-mark" aria-hidden="true">+</span><span>MediBook</span></a><span>Thoughtful care, one appointment at a time.</span></div><span>Made for better days.</span></footer>
@@ -730,96 +731,6 @@ function DoctorDashboard() {
       )}
     </section>
   );
-}
-
-function AdminDashboard() {
-  const [doctors, setDoctors] = useState([]);
-  const [loadState, setLoadState] = useState('loading');
-  const [loadError, setLoadError] = useState('');
-  const [refresh, setRefresh] = useState(0);
-  const [saving, setSaving] = useState(false);
-  const [changingId, setChangingId] = useState('');
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [form, setForm] = useState({ name: '', email: '', password: '', specialty: '', consultationFee: '', bio: '', timezone: 'Asia/Kolkata', days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '17:00' });
-
-  useEffect(() => {
-    let active = true;
-    setLoadState('loading');
-    setLoadError('');
-    apiRequest('/admin/doctors?page=1&limit=50')
-      .then((data) => { if (active) { setDoctors(data.doctors || []); setLoadState('ready'); } })
-      .catch((issue) => { if (active) { setLoadError(formatApiError(issue)); setLoadState('error'); } });
-    return () => { active = false; };
-  }, [refresh]);
-
-  function update(field, value) { setForm((current) => ({ ...current, [field]: value })); setError(''); }
-
-  async function createDoctor(event) {
-    event.preventDefault();
-    setError(''); setMessage('');
-    const fee = Number(form.consultationFee);
-    if (!form.name.trim() || form.name.trim().length < 2) return setError('Enter a doctor name with at least 2 characters.');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setError('Enter a valid email address.');
-    if (form.password.length < 8 || new TextEncoder().encode(form.password).length > 72) return setError('Temporary password must be 8–72 UTF-8 bytes.');
-    if (!form.specialty.trim() || form.specialty.trim().length > 80) return setError('Specialty must be 1–80 characters.');
-    if (!Number.isFinite(fee) || fee < 0 || fee > 1000000) return setError('Enter a consultation fee from ₹0 to ₹10,00,000.');
-    if (!form.days.length) return setError('Select at least one weekly working day.');
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(form.startTime) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(form.endTime) || form.startTime >= form.endTime) return setError('Enter valid working hours with the end time after the start time.');
-    setSaving(true);
-    try {
-      const response = await apiRequest('/admin/doctors', { method: 'POST', body: JSON.stringify({
-        name: form.name.trim(), email: form.email.trim(), password: form.password, specialty: form.specialty.trim(), consultationFee: fee,
-        bio: form.bio.trim(), timezone: form.timezone.trim(), availability: form.days.map((weekday) => ({ weekday, startTime: form.startTime, endTime: form.endTime })),
-      }) });
-      setForm((current) => ({ ...current, name: '', email: '', password: '', specialty: '', consultationFee: '', bio: '' }));
-      setMessage(`Doctor account created for ${response.doctor.user.name}. Share the temporary password through a secure channel and ask them to change it after sign-in.`);
-      setRefresh((value) => value + 1);
-    } catch (issue) {
-      setError(formatApiError(issue));
-    } finally { setSaving(false); }
-  }
-
-  async function toggleDoctor(doctor) {
-    setChangingId(doctor.id); setError(''); setMessage('');
-    try {
-      await apiRequest(`/admin/doctors/${encodeURIComponent(doctor.id)}/status`, { method: 'PATCH', body: JSON.stringify({ isActive: !doctor.user.isActive }) });
-      setMessage(`${doctor.user.name}'s account is now ${doctor.user.isActive ? 'inactive' : 'active'}.`);
-      setRefresh((value) => value + 1);
-    } catch (issue) { setError(formatApiError(issue)); }
-    finally { setChangingId(''); }
-  }
-
-  return <section className="doctor-dashboard-page admin-dashboard-page">
-    <div className="dashboard-heading doctor-dashboard-heading"><div><p className="eyebrow">ACCOUNT AND PROFILE MANAGEMENT</p><h1>Admin dashboard</h1><p className="muted">Provision doctor accounts and manage their public directory profiles.</p></div><button className="button button-outline" type="button" disabled={loadState === 'loading'} onClick={() => setRefresh((value) => value + 1)}>Refresh doctors ↻</button></div>
-    {message && <div className="doctor-success" role="status"><span>✓</span>{message}</div>}
-    {error && <div className="inline-error" role="alert">{error}</div>}
-    <div className="admin-workspace-grid">
-      <section className="availability-panel admin-create-panel" aria-labelledby="admin-create-title"><div className="doctor-panel-heading"><div><p className="eyebrow">PROVISION A NEW ACCOUNT</p><h2 id="admin-create-title">Add a doctor</h2></div><span className="availability-clock">+</span></div>
-        <p className="muted">The password is used once for provisioning and is never returned by the API. Share it securely.</p>
-        <form onSubmit={createDoctor}>
-          <div className="admin-form-grid">
-            <label className="field">Full name<input autoComplete="name" value={form.name} onChange={(event) => update('name', event.target.value)} maxLength={100} required /></label>
-            <label className="field">Email address<input type="email" autoComplete="email" value={form.email} onChange={(event) => update('email', event.target.value)} maxLength={254} required /></label>
-            <label className="field">Temporary password<input type="password" autoComplete="new-password" value={form.password} onChange={(event) => update('password', event.target.value)} minLength={8} required /><small>8–72 UTF-8 bytes</small></label>
-            <label className="field">Specialty<input value={form.specialty} onChange={(event) => update('specialty', event.target.value)} maxLength={80} required /></label>
-            <label className="field">Consultation fee (₹)<input type="number" min="0" max="1000000" step="1" value={form.consultationFee} onChange={(event) => update('consultationFee', event.target.value)} required /></label>
-            <label className="field">IANA timezone<input value={form.timezone} onChange={(event) => update('timezone', event.target.value)} placeholder="Asia/Kolkata" required /></label>
-          </div>
-          <label className="field">Profile biography<textarea rows="3" maxLength={2000} value={form.bio} onChange={(event) => update('bio', event.target.value)} /></label>
-          <fieldset className="admin-days"><legend>Weekly working days</legend><div>{WEEKDAYS.map((day, weekday) => <label key={day}><input type="checkbox" checked={form.days.includes(weekday)} onChange={(event) => update('days', event.target.checked ? [...form.days, weekday].sort((a, b) => a - b) : form.days.filter((value) => value !== weekday))} />{day.slice(0, 3)}</label>)}</div></fieldset>
-          <div className="admin-form-grid admin-hours"><label className="field">Start time<input type="time" value={form.startTime} onChange={(event) => update('startTime', event.target.value)} required /></label><label className="field">End time<input type="time" value={form.endTime} onChange={(event) => update('endTime', event.target.value)} required /></label></div>
-          <button className="button button-primary button-full" type="submit" disabled={saving}>{saving ? 'Creating doctor account…' : 'Create doctor account'}</button>
-        </form>
-      </section>
-      <section className="doctor-appointments-panel admin-doctors-panel" aria-labelledby="admin-doctors-title"><div className="doctor-panel-heading"><div><p className="eyebrow">MANAGED ACCOUNTS</p><h2 id="admin-doctors-title">Doctors</h2></div><span className="panel-timezone">{doctors.length} shown</span></div>
-        {loadState === 'loading' && <div className="state-panel" role="status"><span className="spinner" /> Loading doctor accounts…</div>}
-        {loadState === 'error' && <div className="state-panel state-error" role="alert"><strong>We couldn’t load doctor accounts.</strong><span>{loadError}</span><button className="button button-outline" type="button" onClick={() => setRefresh((value) => value + 1)}>Try again</button></div>}
-        {loadState === 'ready' && doctors.length === 0 && <div className="doctor-empty"><span>✳</span><strong>No doctor accounts yet</strong><p>Create the first doctor profile using the form.</p></div>}
-        {loadState === 'ready' && doctors.length > 0 && <div className="admin-doctor-list">{doctors.map((doctor) => <article className="admin-doctor-card" key={doctor.id}><div><strong>{doctor.user.name}</strong><span>{doctor.user.email}</span><small>{doctor.specialty} · ₹{Number(doctor.consultationFee).toLocaleString('en-IN')}</small></div><div className="admin-doctor-actions"><span className={`status-badge ${doctor.user.isActive ? 'status-accepted' : 'status-cancelled'}`}>{doctor.user.isActive ? 'Active' : 'Inactive'}</span><button className="button button-outline" type="button" disabled={changingId === doctor.id} onClick={() => toggleDoctor(doctor)}>{changingId === doctor.id ? 'Saving…' : doctor.user.isActive ? 'Deactivate' : 'Activate'}</button></div></article>)}</div>}
-      </section>
-    </div>
-  </section>;
 }
 
 export default App;

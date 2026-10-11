@@ -18,6 +18,30 @@ router.get('/doctors', async (req, res, next) => {
   }
 });
 
+router.get('/appointments', async (req, res, next) => {
+  try {
+    return res.json(await admin.listAppointments(req.query));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/stats', async (_req, res, next) => {
+  try {
+    return res.json(await admin.getStatistics());
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/users', async (req, res, next) => {
+  try {
+    return res.json(await admin.listUsers(req.query));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post('/doctors', async (req, res, next) => {
   try {
     return res.status(201).json(await admin.createDoctor(req.body));
@@ -26,9 +50,25 @@ router.post('/doctors', async (req, res, next) => {
   }
 });
 
+router.patch('/doctors/:doctorId', async (req, res, next) => {
+  try {
+    return res.json(await admin.updateDoctorProfile(req.params.doctorId, req.body));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.patch('/doctors/:doctorId/status', async (req, res, next) => {
   try {
     return res.json(await admin.setDoctorStatus(req.params.doctorId, req.body));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch('/users/:userId/status', async (req, res, next) => {
+  try {
+    return res.json(await admin.setUserStatus(req.params.userId, req.body, req.user._id));
   } catch (error) {
     return next(error);
   }

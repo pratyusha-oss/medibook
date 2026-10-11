@@ -11,7 +11,7 @@ The API uses JSON under `/api`. Errors use `{ "error": { "code": "...", "message
 | Patient appointments | `POST /api/appointments`, `GET /api/appointments/me`, `PATCH /api/appointments/:id/cancel` | Patient role; implemented |
 | Doctor profile and availability | `GET /api/doctor/me`, `PUT /api/doctor/me/availability` | Doctor role; implemented |
 | Doctor appointment management | `GET /api/doctor/appointments`, `PATCH /api/doctor/appointments/:id/status` | Doctor role; implemented |
-| Admin doctor management | `GET /api/admin/doctors`, `POST /api/admin/doctors`, `PATCH /api/admin/doctors/:doctorId/status` | Admin role; implemented |
+| Admin management | `GET /api/admin/stats`, `GET /api/admin/appointments`, `GET /api/admin/users`, `PATCH /api/admin/users/:userId/status`, doctor list/create/edit/status endpoints | Admin role; implemented |
 
 ### Authentication details
 
@@ -59,3 +59,17 @@ All `/api/admin/*` routes require an active account Bearer token and the `admin`
 - `POST /api/admin/doctors` accepts `{ "name", "email", "password", "specialty", "consultationFee", "bio?", "timezone?", "availability?" }`. The password is a one-time temporary credential supplied over the authenticated admin workflow. The server hashes it, always assigns the `doctor` role, creates the linked User and Doctor records, and returns `201` with `{ "doctor" }`; credentials and password hashes are never returned. Email conflicts return `409 EMAIL_IN_USE`. Availability uses weekday numbers `0`–`6`, local `HH:mm`, and an IANA timezone; timezone defaults to `Asia/Kolkata` and availability defaults to an empty array.
 - `PATCH /api/admin/doctors/:doctorId/status` accepts `{ "isActive": true|false }` and returns `{ "doctor" }`. Deactivation hides the profile from public discovery and blocks login. It returns `409 DOCTOR_HAS_UPCOMING_APPOINTMENTS` if future requested or accepted appointments remain; the admin must resolve those appointments first.
 - Patients and doctors receive `403 FORBIDDEN` from admin routes. Missing or invalid tokens receive `401`.
+
+### Admin overview, appointments, and users
+
+All routes in this section require an active admin Bearer token. Lists use `page` (default 1) and `limit` (default 20, maximum 50) and return pagination metadata with database totals.
+
+- `GET /api/admin/stats` returns counts computed from MongoDB: `{ "statistics": { "totalPatients", "activeDoctors", "totalAppointments", "appointmentsByStatus": { "requested", "accepted", "rejected", "cancelled", "completed" } } }`. Missing statuses and empty collections count as zero.
+- `GET /api/admin/appointments` supports optional `status`, `doctorId`, `patientId`, and paired `from`/`to` timezone-qualified ISO datetimes. The date range must be ordered and no longer than 366 days. It returns paginated appointments with UTC instants and only the patient name and doctor name, specialty, and fee for display; it omits emails and credentials.
+- `GET /api/admin/users` supports optional `role=patient|doctor|admin`, `status=all|active|inactive`, and `q` (name or email search). It returns account ID, name, email, role, active state, creation date, and pagination metadata. Password hashes are not selected.
+- `PATCH /api/admin/users/:userId/status` accepts `{ "isActive": true|false }`; roles cannot be changed. The admin cannot deactivate their own account or the last active admin. Deactivation is rejected with `409 USER_HAS_UPCOMING_APPOINTMENTS` if the patient or linked doctor has future requested or accepted appointments.
+
+### Admin doctor profile editing
+
+- `PATCH /api/admin/doctors/:doctorId` accepts any supported subset of `{ "specialty", "bio", "consultationFee", "timezone", "availability" }`. Unknown fields (including role/account fields) are rejected. Schedule or timezone changes validate weekly windows and return `409 AVAILABILITY_CONFLICT` if they would exclude an existing future requested or accepted appointment. No profile update is saved on conflict.
+- Existing `PATCH /api/admin/doctors/:doctorId/status` remains supported for doctor activation. It applies the same appointment-preservation check before deactivation.

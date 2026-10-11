@@ -33,9 +33,10 @@ function modelHarness({ doctorCreate, userCreate, appointments = [] } = {}) {
     find(query) {
       return { distinct: async () => query.isActive === false ? [] : [userId] };
     },
-    async findByIdAndUpdate(id, update) {
+    findById(id) { return { select: async () => ({ ...user, _id: id, isActive: true }) }; },
+    findByIdAndUpdate(id, update) {
       calls.userUpdates.push({ id, update });
-      return { ...user, isActive: update.$set.isActive };
+      return { select: async () => ({ ...user, isActive: update.$set.isActive }) };
     },
   };
   const Doctor = {
@@ -52,6 +53,7 @@ function modelHarness({ doctorCreate, userCreate, appointments = [] } = {}) {
     },
     async deleteOne(filter) { calls.profilesDeleted.push(filter); },
     countDocuments: async () => 1,
+    findOne() { return { select: async () => ({ _id: doctorId }) }; },
     findById() { return { populate: async () => ({ ...doctor, user: { ...user, _id: userId } }) }; },
   };
   const Appointment = {
