@@ -50,4 +50,25 @@ docs/     Architecture, schema, API and handover material
 
 ## Status
 
-Patient authentication, public doctor discovery, and patient appointment booking/history are implemented. Doctor/admin management dashboards and deployment remain planned milestones.
+Patient authentication, public doctor discovery, patient appointments, doctor workspace, and admin doctor provisioning are implemented. Deployment remains a required handover milestone.
+
+## Bootstrap the first admin
+
+Public registration always creates a patient. Create the first admin from a trusted machine with database access; this one-time script hashes the password, refuses a second bootstrap, and never prints credentials. It writes a persistent singleton marker in `admin_bootstrap_locks` so concurrent runs cannot provision separate first admins.
+
+In PowerShell from the repository root, supply a private password at the secure prompt and keep it only in the current process environment for this command:
+
+```powershell
+$securePassword = Read-Host "Initial admin password" -AsSecureString
+$env:ADMIN_BOOTSTRAP_NAME = "MediBook Administrator"
+$env:ADMIN_BOOTSTRAP_EMAIL = "admin@example.test"
+$env:ADMIN_BOOTSTRAP_PASSWORD = [System.Net.NetworkCredential]::new('', $securePassword).Password
+try {
+  npm run bootstrap:admin --workspace server
+} finally {
+  Remove-Item Env:ADMIN_BOOTSTRAP_NAME, Env:ADMIN_BOOTSTRAP_EMAIL, Env:ADMIN_BOOTSTRAP_PASSWORD -ErrorAction SilentlyContinue
+  Remove-Variable securePassword -ErrorAction SilentlyContinue
+}
+```
+
+The script reads `MONGODB_URI` from `server/.env` (or the process environment). Keep the admin password out of `.env`, command history, source control, and frontend variables. The bootstrap refuses `NODE_ENV=production` unless the operator deliberately sets both `ADMIN_BOOTSTRAP_ALLOW_PRODUCTION=true` and `ADMIN_BOOTSTRAP_PRODUCTION_CONFIRMATION=CREATE_FIRST_ADMIN_IN_PRODUCTION` for that single command on a secured host. Remove those opt-in variables immediately afterward. The persistent marker prevents reusing the bootstrap; later administrators must be provisioned through an authorized operational process.

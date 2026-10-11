@@ -14,6 +14,8 @@ Availability is stored as weekly local-time windows in the doctor's IANA timezon
 
 Public registration creates patient accounts only; doctor and admin roles cannot be selected in a signup request. Passwords are hashed with bcryptjs, and the database field is excluded from normal query results. Access tokens are signed with a server-only secret and expire after seven days. Protected requests verify the token and load the current active account from MongoDB, so role changes and account deactivation take effect without waiting for the token to expire. Role middleware checks permissions on the server; the frontend is not trusted to enforce access.
 
+The first admin is created by a one-time server script, never by public signup. It requires a password through a short-lived process environment variable, hashes it with the same bcrypt mechanism, and atomically claims a persistent singleton bootstrap marker before checking that no admin exists. A production run additionally requires two deliberate opt-in values. Admin doctor routes create doctor-role users and linked doctor profiles; if profile creation fails after user creation, the service removes that just-created user to avoid an orphan login. Admin deactivation checks future requested and accepted appointments first and refuses the operation with a conflict response until they are resolved. The admin dashboard is hidden by role-aware navigation, while every operation remains protected by backend middleware.
+
 Request bodies are validated before database writes, JSON input size is limited, and CORS uses the configured client origin. Secrets belong in server-side environment variables, never in the client bundle or Git.
 
 ## Doctor workspace

@@ -11,7 +11,7 @@ The API uses JSON under `/api`. Errors use `{ "error": { "code": "...", "message
 | Patient appointments | `POST /api/appointments`, `GET /api/appointments/me`, `PATCH /api/appointments/:id/cancel` | Patient role; implemented |
 | Doctor profile and availability | `GET /api/doctor/me`, `PUT /api/doctor/me/availability` | Doctor role; implemented |
 | Doctor appointment management | `GET /api/doctor/appointments`, `PATCH /api/doctor/appointments/:id/status` | Doctor role; implemented |
-| Admin | Dashboard statistics, appointment review, doctor and account management routes | Planned; admin routes are not implemented |
+| Admin doctor management | `GET /api/admin/doctors`, `POST /api/admin/doctors`, `PATCH /api/admin/doctors/:doctorId/status` | Admin role; implemented |
 
 ### Authentication details
 
@@ -50,3 +50,12 @@ All `/api/doctor/*` endpoints require a Bearer token for an active doctor accoun
 - Invalid timezone, weekday, clock values, ordering, or overlapping windows return `400 INVALID_AVAILABILITY`. If a change would exclude a future requested or accepted appointment, the API returns `409 AVAILABILITY_CONFLICT` with the affected appointment IDs, UTC start times, patient names, and statuses. No changes are saved. Cancelled and rejected appointments do not constrain the schedule.
 
 Saved weekly availability is used immediately by the public doctor slots endpoint. Appointment instants remain stored in UTC; weekly hours remain local to the doctor's configured timezone.
+
+### Admin doctor management
+
+All `/api/admin/*` routes require an active account Bearer token and the `admin` role. Public registration remains patient-only. Bootstrap the first administrator with the one-time `npm run bootstrap:admin --workspace server` script described in the root README; production requires explicit opt-in environment settings. The bootstrap script does not return a token or password.
+
+- `GET /api/admin/doctors?page=1&limit=20&status=all&q=cardiology` returns `{ "doctors", "pagination" }`. `status` is `all`, `active`, or `inactive`; optional `q` searches doctor names, emails, specialties, and biographies.
+- `POST /api/admin/doctors` accepts `{ "name", "email", "password", "specialty", "consultationFee", "bio?", "timezone?", "availability?" }`. The password is a one-time temporary credential supplied over the authenticated admin workflow. The server hashes it, always assigns the `doctor` role, creates the linked User and Doctor records, and returns `201` with `{ "doctor" }`; credentials and password hashes are never returned. Email conflicts return `409 EMAIL_IN_USE`. Availability uses weekday numbers `0`–`6`, local `HH:mm`, and an IANA timezone; timezone defaults to `Asia/Kolkata` and availability defaults to an empty array.
+- `PATCH /api/admin/doctors/:doctorId/status` accepts `{ "isActive": true|false }` and returns `{ "doctor" }`. Deactivation hides the profile from public discovery and blocks login. It returns `409 DOCTOR_HAS_UPCOMING_APPOINTMENTS` if future requested or accepted appointments remain; the admin must resolve those appointments first.
+- Patients and doctors receive `403 FORBIDDEN` from admin routes. Missing or invalid tokens receive `401`.

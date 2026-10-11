@@ -4,6 +4,7 @@ import authRouter from './routes/auth.js';
 import doctorsRouter from './routes/doctors.js';
 import appointmentsRouter from './routes/appointments.js';
 import doctorDashboardRouter from './routes/doctorDashboard.js';
+import adminRouter from './routes/admin.js';
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/doctors', doctorsRouter);
 app.use('/api/appointments', appointmentsRouter);
 app.use('/api/doctor', doctorDashboardRouter);
+app.use('/api/admin', adminRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found' } });
@@ -40,7 +42,7 @@ app.use((err, _req, res, _next) => {
     : 'Something went wrong';
   if (status >= 500) console.error(err);
   const error = { code, message };
-  if (status < 500 && err.name === 'DoctorDashboardError' && err.details !== undefined) error.details = err.details;
+  if (status < 500 && ['DoctorDashboardError', 'AdminServiceError'].includes(err.name) && err.details !== undefined) error.details = err.details;
   res.status(status).json({ error });
 });
 

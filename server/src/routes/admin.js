@@ -1,0 +1,37 @@
+import { Router } from 'express';
+import { Appointment } from '../models/Appointment.js';
+import { Doctor } from '../models/Doctor.js';
+import { User } from '../models/User.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
+import { createAdminService } from '../services/adminService.js';
+
+const router = Router();
+const admin = createAdminService({ User, Doctor, Appointment });
+
+router.use(authenticate, requireRole('admin'));
+
+router.get('/doctors', async (req, res, next) => {
+  try {
+    return res.json(await admin.listDoctors(req.query));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/doctors', async (req, res, next) => {
+  try {
+    return res.status(201).json(await admin.createDoctor(req.body));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch('/doctors/:doctorId/status', async (req, res, next) => {
+  try {
+    return res.json(await admin.setDoctorStatus(req.params.doctorId, req.body));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+export default router;
