@@ -6,6 +6,7 @@ coverage/
 !.env
 /server/.env
 !/server/.env.example
+!/client/.env.example
 .vercel/
 .render/
 *.log
