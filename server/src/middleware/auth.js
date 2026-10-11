@@ -10,17 +10,22 @@ export async function authenticate(req, res, next) {
   const match = authorization.match(/^Bearer\s+(.+)$/i);
   if (!match) return unauthorized(res);
 
+  let payload;
   try {
-    const payload = verifyAccessToken(match[1]);
+    payload = verifyAccessToken(match[1]);
     if (typeof payload === 'string' || !payload.sub) return unauthorized(res);
+  } catch {
+    return unauthorized(res);
+  }
 
+  try {
     const user = await User.findById(payload.sub).select('name email role isActive');
     if (!user || !user.isActive) return unauthorized(res);
 
     req.user = user;
     return next();
-  } catch {
-    return unauthorized(res);
+  } catch (error) {
+    return next(error);
   }
 }
 

@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 
+const DEFAULT_TIME_ZONE = 'Asia/Kolkata';
+
 const availabilityWindowSchema = new mongoose.Schema(
   {
     weekday: { type: Number, min: 0, max: 6, required: true },
@@ -15,6 +17,22 @@ const doctorSchema = new mongoose.Schema(
     specialty: { type: String, required: true, trim: true, maxlength: 80 },
     consultationFee: { type: Number, required: true, min: 0 },
     bio: { type: String, default: '', trim: true, maxlength: 2000 },
+    timezone: {
+      type: String,
+      required: true,
+      default: DEFAULT_TIME_ZONE,
+      validate: {
+        validator(value) {
+          try {
+            new Intl.DateTimeFormat('en-US', { timeZone: value });
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        message: 'timezone must be a valid IANA timezone',
+      },
+    },
     availability: { type: [availabilityWindowSchema], default: [] },
   },
   { timestamps: true },

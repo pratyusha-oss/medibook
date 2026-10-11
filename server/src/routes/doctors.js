@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import { Doctor } from '../models/Doctor.js';
+import { Appointment } from '../models/Appointment.js';
 import { User } from '../models/User.js';
 import { escapeRegex, parseDoctorListQuery } from '../utils/doctorQuery.js';
+import { createAppointmentService, SLOT_DURATION_MINUTES } from '../services/appointmentService.js';
 
 const router = Router();
+const appointmentService = createAppointmentService({ Doctor, Appointment });
 
 function publicDoctor(doctor) {
   return {
@@ -55,6 +58,20 @@ router.get('/', async (req, res) => {
     doctors: doctors.map(publicDoctor),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   });
+});
+
+router.get('/:doctorId/slots', async (req, res, next) => {
+  try {
+    const { timezone, slots } = await appointmentService.getDoctorSlots(req.params.doctorId, req.query);
+    return res.json({
+      doctorId: req.params.doctorId,
+      timezone,
+      slotDurationMinutes: SLOT_DURATION_MINUTES,
+      slots: slots.map(({ startsAt, endsAt }) => ({ startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() })),
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 router.get('/:id', async (req, res) => {

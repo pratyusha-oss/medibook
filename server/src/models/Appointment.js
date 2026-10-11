@@ -21,5 +21,7 @@ const appointmentSchema = new mongoose.Schema(
 );
 
 appointmentSchema.index({ activeSlotKey: 1 }, { unique: true, sparse: true });
+appointmentSchema.index({ doctor: 1, status: 1, startsAt: 1 });
+appointmentSchema.index({ patient: 1, startsAt: -1 });
 
 export const Appointment = mongoose.model('Appointment', appointmentSchema);

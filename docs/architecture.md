@@ -5,10 +5,10 @@ MediBook uses one repository with two npm workspaces. `client/` is a React singl
 ## Data model
 
 - **User** stores a person's name, normalized email, password hash, role, and active-account flag. Password hashes are excluded from normal query results.
-- **Doctor** extends a doctor-role user with a specialty, consultation fee, biography, and weekly availability windows.
+- **Doctor** extends a doctor-role user with a specialty, consultation fee, biography, an IANA timezone, and weekly availability windows.
 - **Appointment** links a patient user to a doctor profile, stores a time interval and lifecycle status, and reserves a slot using a unique sparse key while active.
 
-Availability is stored as weekly local-time windows. Slot generation and timezone policy will be made explicit when appointment APIs are implemented. MongoDB's unique index on `activeSlotKey` is the final guard against two simultaneous reservations of the same doctor and start time; the booking service must clear that key atomically when an appointment is no longer active.
+Availability is stored as weekly local-time windows in the doctor's IANA timezone (default `Asia/Kolkata`). Slots are fixed at 30 minutes. API datetimes are timezone-qualified ISO values and appointment instants are stored in UTC. MongoDB's unique sparse index on `activeSlotKey` is the final guard against two simultaneous reservations of the same doctor and slot start; booking assigns the key, and cancellation atomically unsets it.
 
 ## Security boundaries
 
