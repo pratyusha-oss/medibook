@@ -142,6 +142,7 @@ a { color: inherit; }
   .auth-layout { min-height: auto; grid-template-columns: 1fr; gap: 28px; padding: 40px 0 60px; }.auth-aside { padding: 0 5%; }.auth-aside h1 { font-size: 3.2rem; }.auth-aside .mini-icon { margin-bottom: 16px; }.auth-aside > p:not(.eyebrow) { margin: 15px 0; }.auth-card { max-width: 500px; width: 100%; margin: auto; padding: 25px; }.auth-card .eyebrow { margin-top: 27px; }
   .site-footer { align-items: flex-start; flex-direction: column; justify-content: center; padding: 20px 0; }.site-footer > div { align-items: flex-start; flex-direction: column; gap: 9px; }
 }
+
 @media (max-width: 390px) {
   .header-inner, .main-content, .site-footer { width: calc(100% - 28px); }.brand { gap: 6px; font-size: .95rem; }.brand-mark { width: 29px; height: 29px; border-radius: 10px; }.main-nav { gap: 7px; }.nav-link { font-size: .68rem; }.account-actions .button { padding-inline: 7px; font-size: .66rem; }.appointment-card { grid-template-columns: 1fr; }.appointment-actions { grid-column: 1; grid-row: auto; align-items: flex-start; flex-direction: row; }.slot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -229,4 +230,142 @@ a { color: inherit; }
 @media (max-width: 720px) {
   .doctor-dashboard-page { padding: 40px 0 65px; }.doctor-stat-grid { grid-template-columns: 1fr; gap: 8px; }.doctor-stat { padding: 12px 14px; }.doctor-stat .stat-symbol { width: 35px; height: 35px; }.doctor-appointments-panel, .availability-panel { padding: 17px; }.doctor-dashboard-heading { align-items: flex-start; }.availability-window-row { grid-template-columns: minmax(82px, 1fr) minmax(75px, .8fr) 12px minmax(75px, .8fr) 22px; gap: 3px; }.availability-window-row select, .availability-window-row input { padding-inline: 4px; font-size: .62rem; }.doctor-appointment-top { align-items: start; }
   .admin-workspace-grid { grid-template-columns: 1fr; }.admin-form-grid { grid-template-columns: 1fr; }.admin-doctor-card { align-items: flex-start; }.admin-doctor-actions { align-items: flex-end; }.admin-tabs { margin-inline: -3px; }.admin-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.admin-table { min-width: 720px; }.admin-filters { align-items: stretch; }.admin-search { flex-basis: 100%; }
+}
+
+/* Focused small-screen refinements; desktop rules above remain unchanged. */
+@media (max-width: 820px) {
+  .admin-table-wrap { overflow: visible; border: 0; background: transparent; }
+  .admin-table { display: block; width: 100%; min-width: 0; }
+  .admin-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .admin-table tbody { display: grid; gap: 10px; }
+  .admin-table tr { display: block; overflow: hidden; border: 1px solid #e5ebe4; border-radius: 11px; background: #fff; }
+  .admin-table td, .admin-table td:first-child { display: block; width: 100%; min-width: 0; border-bottom: 1px solid #edf0eb; padding: 10px 12px; overflow-wrap: anywhere; }
+  .admin-table td::before { display: block; margin-bottom: 5px; color: #87948b; content: attr(data-label); font-size: .62rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .admin-table tr:last-child td:last-child { border-bottom: 0; }
+  .admin-table .admin-inline-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-table .button { min-height: 42px; white-space: normal; }
+}
+
+@media (max-width: 720px) {
+  .header-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand actions" "nav nav"; align-items: center; gap: 5px 8px; padding-block: 9px; }
+  .brand { grid-area: brand; min-width: 0; white-space: nowrap; }
+  .main-nav { grid-area: nav; width: 100%; justify-content: flex-start; gap: 17px; }
+  .nav-link { min-height: 44px; white-space: nowrap; }
+  .account-actions { grid-area: actions; min-width: 0; justify-self: end; }
+  .account-actions .button { min-height: 42px; padding-inline: 9px; white-space: nowrap; }
+  .main-content, .directory-section, .profile-page, .appointments-page, .doctor-dashboard-page, .admin-dashboard-page { min-width: 0; }
+  .section-heading, .dashboard-heading, .doctor-panel-heading { min-width: 0; }
+  .hero { padding-top: 45px; }
+  .hero h1 { font-size: clamp(3.15rem, 12vw, 4.8rem); }
+  .hero-art { min-height: 330px; transform: scale(.78); }
+  .directory-section { padding: 38px 4% 58px; }
+  .search-panel { min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .search-field, .search-field input { min-width: 0; }
+  .button-search { min-height: 44px; }
+  .doctor-card, .doctor-appointment-card, .appointment-card, .availability-panel, .doctor-appointments-panel, .auth-card, .booking-card { min-width: 0; }
+  .button-card, .back-link { min-height: 44px; }
+  .doctor-card-person > div:last-child, .appointment-doctor > div:last-child { min-width: 0; }
+  .doctor-card-person h3, .doctor-appointment-top h3 { overflow-wrap: anywhere; }
+  .doctor-card-bottom { align-items: center; }
+  .profile-hero-card { min-width: 0; gap: 13px; padding: 18px; }
+  .profile-identity { min-width: 0; }
+  .profile-identity h1 { overflow-wrap: anywhere; font-size: clamp(1.55rem, 7vw, 2rem); }
+  .profile-fee { gap: 3px; font-size: .62rem; }
+  .profile-fee strong { font-size: 1.2rem; }
+  .booking-card { padding: 19px; }
+  .slot-button { min-height: 44px; }
+  .booking-form .button, .booking-card > .button { width: 100%; min-height: 46px; }
+  .appointments-page { padding-top: 34px; }
+  .dashboard-heading { gap: 12px; margin-bottom: 22px; }
+  .dashboard-heading h1 { font-size: clamp(2.25rem, 10vw, 3.3rem); overflow-wrap: anywhere; }
+  .dashboard-heading > .button { min-height: 44px; }
+  .appointment-card { min-width: 0; padding: 14px; }
+  .appointment-doctor small { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+  .appointment-actions { min-width: 0; }
+  .appointment-actions .button { min-height: 42px; }
+  .auth-layout { padding: 34px 0 46px; }
+  .auth-aside { min-width: 0; padding-inline: 2%; }
+  .auth-aside h1 { font-size: clamp(2.3rem, 9vw, 3rem); overflow-wrap: anywhere; }
+  .auth-card { padding: 20px; }
+  .auth-card .field input, .auth-card .field select, .auth-card .button { min-height: 46px; }
+  .notice, .doctor-success, .inline-error { min-width: 0; overflow-wrap: anywhere; }
+  .doctor-dashboard-page { padding-top: 32px; }
+  .doctor-dashboard-heading h1 { font-size: clamp(2.25rem, 10vw, 3.2rem); }
+  .doctor-dashboard-heading > .button { width: 100%; }
+  .doctor-stat-grid, .admin-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .doctor-stat { min-width: 0; gap: 8px; padding: 12px; }
+  .doctor-stat .stat-symbol { flex: 0 0 32px; width: 32px; height: 32px; }
+  .doctor-stat small { line-height: 1.35; }
+  .doctor-workspace-grid { grid-template-columns: minmax(0, 1fr); }
+  .doctor-appointments-panel, .availability-panel { padding: 14px; }
+  .doctor-panel-heading { align-items: flex-start; gap: 8px; }
+  .doctor-panel-heading h2 { font-size: clamp(1.45rem, 7vw, 1.85rem); }
+  .doctor-appointment-top { flex-wrap: wrap; }
+  .doctor-appointment-top > div { min-width: 0; }
+  .doctor-appointment-meta { overflow-wrap: anywhere; }
+  .doctor-appointment-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .doctor-appointment-actions .button { min-height: 44px; padding-inline: 8px; }
+  .doctor-profile-editor { grid-column: auto; }
+  .doctor-profile-editor .admin-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .doctor-profile-editor .button { min-height: 44px; }
+  .doctor-pagination, .pagination { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; width: 100%; }
+  .doctor-pagination .button, .pagination .button { min-width: 0; min-height: 42px; padding-inline: 7px; font-size: .68rem; white-space: nowrap; }
+  .doctor-pagination > span, .pagination > span { text-align: center; font-size: .68rem; }
+  .availability-window-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 42px; gap: 7px; }
+  .availability-window-row label:first-child { grid-column: 1 / -1; }
+  .availability-window-row label:nth-of-type(2) { grid-column: 1; }
+  .availability-window-row label:nth-of-type(3) { grid-column: 2; }
+  .availability-window-row .window-separator { display: none; }
+  .availability-window-row .remove-window { grid-column: 3; grid-row: 2; width: 42px; height: 42px; border: 1px solid #e3eae2; }
+  .availability-window-row select, .availability-window-row input { height: 44px; padding-inline: 8px; font-size: .76rem; }
+  .add-window { min-height: 42px; }
+  .admin-dashboard-page { padding-top: 32px; }
+  .admin-tabs { flex-wrap: wrap; overflow: visible; gap: 4px; }
+  .admin-tab { min-height: 44px; padding: 8px 11px; }
+  .admin-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-filters, .admin-appointment-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 8px; }
+  .admin-filters .field, .admin-appointment-filters .field { min-width: 0; width: 100%; }
+  .admin-search { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) auto; align-items: end; min-width: 0; }
+  .admin-search .field { min-width: 0; }
+  .admin-filters > .button { min-height: 44px; }
+  .admin-appointment-filters > .button { min-height: 44px; }
+  .admin-table .admin-inline-actions { grid-template-columns: minmax(0, 1fr); }
+  .admin-table .button { min-height: 44px; }
+  .admin-pagination { gap: 6px; }
+  .admin-create-panel .button, .admin-create-panel input, .admin-create-panel select, .admin-create-panel textarea { min-height: 44px; }
+  .admin-days label { min-height: 40px; }
+  .site-footer { gap: 10px; }
+}
+
+@media (max-width: 420px) {
+  .header-inner, .main-content, .site-footer { width: calc(100% - 24px); }
+  .header-inner { gap: 4px 6px; }
+  .brand { font-size: .9rem; }
+  .brand-mark { width: 28px; height: 28px; }
+  .main-nav { gap: 12px; }
+  .nav-link { font-size: .7rem; }
+  .account-actions { gap: 3px; }
+  .account-actions .button { padding-inline: 7px; font-size: .68rem; }
+  .hero { padding-inline: 2%; }
+  .hero h1 { font-size: clamp(2.9rem, 11.6vw, 3.6rem); }
+  .hero-art { min-height: 300px; transform: scale(.72); }
+  .search-panel { grid-template-columns: minmax(0, 1fr); }
+  .search-main, .button-search { grid-column: 1; }
+  .search-field { min-height: 46px; border: 1px solid #edf0eb; }
+  .results-meta { gap: 10px; font-size: .7rem; }
+  .results-meta > span:last-child { display: none; }
+  .doctor-card { padding: 18px; }
+  .doctor-card-bottom { align-items: center; }
+  .profile-fee { width: 100%; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 8px; margin-left: 0; }
+  .appointment-card { grid-template-columns: minmax(0, 1fr); }
+  .appointment-actions { grid-column: 1; grid-row: auto; align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
+  .appointment-actions .status-badge { min-height: 36px; align-items: center; }
+  .empty-dashboard { min-height: 280px; padding: 20px; }
+  .admin-filters, .admin-appointment-filters { grid-template-columns: minmax(0, 1fr); }
+  .admin-search { grid-column: 1; grid-template-columns: minmax(0, 1fr); }
+  .admin-search .button { width: 100%; min-height: 44px; }
+  .admin-appointment-filters > .button { width: 100%; }
+  .admin-tabs { gap: 2px; }
+  .admin-tab { padding-inline: 8px; font-size: .7rem; }
+  .doctor-pagination, .pagination { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
 }
