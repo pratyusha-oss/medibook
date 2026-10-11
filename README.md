@@ -17,6 +17,25 @@ Doctor appointment management system built with MongoDB, Express, React, and Nod
 
 The client and server are separate npm workspaces. The client is a Vite React single-page application; the server exposes JSON REST endpoints and connects to MongoDB through Mongoose.
 
+## Seed a development doctor
+
+The development-only seed creates or updates the `demo.doctor@medibook.test` doctor account and linked profile. It never creates an admin account, and it refuses to run when `NODE_ENV=production`. Re-running it reuses the same user/profile, restores the demo details and active state, and updates the password hash from the supplied environment variable.
+
+In PowerShell, enter a development-only password at the secure prompt and run the seed from the repository root:
+
+```powershell
+$securePassword = Read-Host "Demo doctor password" -AsSecureString
+$env:SEED_DOCTOR_PASSWORD = [System.Net.NetworkCredential]::new('', $securePassword).Password
+try {
+  npm run seed:doctor --workspace server
+} finally {
+  Remove-Item Env:SEED_DOCTOR_PASSWORD -ErrorAction SilentlyContinue
+  Remove-Variable securePassword -ErrorAction SilentlyContinue
+}
+```
+
+The password must contain 8–72 UTF-8 bytes. Keep the variable set only for this local command; do not add it to `.env`, source control, or client-side `VITE_` variables. The demo doctor is available Monday through Saturday, 09:00–17:00 in `Asia/Kolkata`.
+
 ## Environment variables
 
 See [`server/.env.example`](server/.env.example). Never commit `.env` files or place secrets in frontend variables; browser code is public.
@@ -31,4 +50,4 @@ docs/     Architecture, schema, API and handover material
 
 ## Status
 
-The initial scaffold and patient authentication endpoints are implemented. Doctor discovery and management, appointment workflows, dashboards, and deployment remain planned milestones.
+Patient authentication, public doctor discovery, and patient appointment booking/history are implemented. Doctor/admin management dashboards and deployment remain planned milestones.
