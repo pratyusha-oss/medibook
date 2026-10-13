@@ -216,6 +216,8 @@ export function createDoctorDashboardService({ Doctor, Appointment, clock = () =
     const update = status === 'rejected' || status === 'completed'
       ? { $set: { status }, $unset: { activeSlotKey: 1 } }
       : { $set: { status } };
+    // Put ownership and the required old status in the same database update. If a
+    // second request races or the transition is invalid, it cannot overwrite status.
     const updated = await Appointment.findOneAndUpdate(
       { _id: appointmentId, doctor: doctor._id, status: currentStatus },
       update,
@@ -272,6 +274,8 @@ export function createDoctorDashboardService({ Doctor, Appointment, clock = () =
       startsAt: { $gt: clock() },
     }).populate({ path: 'patient', select: 'name' });
 
+    // Check before saving: changing weekly hours must not silently strand a booking
+    // that a patient and doctor already expect to happen.
     const conflicts = futureBookings
       .filter((appointment) => !availabilityCoversAppointment(appointment, nextAvailability.availability, nextAvailability.timezone))
       .map((appointment) => ({

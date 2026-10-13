@@ -2,6 +2,8 @@
 
 MediBook uses one repository with two npm workspaces. `client/` is a React single-page application built with Vite. `server/` is an Express REST API, and Mongoose owns MongoDB connectivity and document schemas. The browser calls the API over HTTP; the API is the authority for validation, authentication, role checks, and appointment state changes.
 
+For a beginner-friendly explanation and a presentation walkthrough, see [the student guide](student-guide.md). This document describes the same design in more technical detail; [the API guide](api.md) lists the exact HTTP contracts.
+
 ## Data model
 
 - **User** stores a person's name, normalized email, password hash, role, and active-account flag. Password hashes are excluded from normal query results.

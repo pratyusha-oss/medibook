@@ -19,6 +19,8 @@ export async function authenticate(req, res, next) {
   }
 
   try {
+    // A token only proves which account signed in. Reload its current role and active flag
+    // so deactivation or a role change takes effect without waiting for token expiry.
     const user = await User.findById(payload.sub).select('name email role isActive');
     if (!user || !user.isActive) return unauthorized(res);
 

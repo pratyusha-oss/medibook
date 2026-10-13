@@ -101,6 +101,7 @@ export function validateAppointmentListQuery(query) {
 
 function formatterFor(timezone) {
   if (!formatterCache.has(timezone)) {
+    // Reuse the timezone formatter while generating many slots; Intl formatters are relatively expensive to create.
     formatterCache.set(timezone, new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
       year: 'numeric',
@@ -135,6 +136,8 @@ function wallClockToInstant(local, timezone) {
   const target = Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute);
   let candidate = target;
 
+  // Treat the local clock reading as a UTC guess, then adjust by the difference the
+  // timezone formatter reports. This converts a doctor's wall-clock time to a real instant.
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const actual = localPartsAt(new Date(candidate), timezone);
     const actualAsUtc = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute);
@@ -165,6 +168,8 @@ export function generateSlots({ availability, timezone, from, to, now = new Date
   const zone = timezone || DEFAULT_TIME_ZONE;
   const firstLocalDay = localPartsAt(from, zone);
   const lastLocalDay = localPartsAt(new Date(to.getTime() - 1), zone);
+  // Walk calendar days in the doctor's timezone, not the server's timezone. Each
+  // local opening window is converted to UTC before it is returned to the browser.
   let dayCursor = Date.UTC(firstLocalDay.year, firstLocalDay.month - 1, firstLocalDay.day);
   const lastDay = Date.UTC(lastLocalDay.year, lastLocalDay.month - 1, lastLocalDay.day);
   const uniqueSlots = new Map();
@@ -290,6 +295,8 @@ export function createAppointmentService({ Doctor, Appointment, clock = () => ne
 
     const activeSlotKey = `${doctor._id}:${slot.startsAt.toISOString()}`;
     try {
+      // This key is uniquely indexed in MongoDB. The earlier availability read makes
+      // normal conflicts friendly; the index also catches two requests racing together.
       const appointment = await Appointment.create({
         patient: patientId,
         doctor: doctor._id,
@@ -337,6 +344,8 @@ export function createAppointmentService({ Doctor, Appointment, clock = () => ne
       throw new AppointmentError(409, 'CANCELLATION_NOT_ALLOWED', 'This appointment can no longer be cancelled');
     }
 
+    // Cancel only if it is still this patient's future active appointment, and release
+    // the reservation in that same atomic write so another patient may book the slot.
     const cancelled = await Appointment.findOneAndUpdate(
       {
         _id: appointmentId,

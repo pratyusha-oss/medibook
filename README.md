@@ -19,6 +19,14 @@ The client uses `VITE_API_BASE_URL` at build time and defaults to the local API 
 
 The client and server are separate npm workspaces. The client is a Vite React single-page application; the server exposes JSON REST endpoints and connects to MongoDB through Mongoose.
 
+## Student walkthrough
+
+Start with [the student guide](docs/student-guide.md) for a plain-language explanation of the app, a suggested presentation flow, and a code-reading order. Use [the architecture guide](docs/architecture.md) for the system design and [the API guide](docs/api.md) for exact request and response formats.
+
+For a quick demo, register or sign in as a patient, find a doctor, open the doctor's profile, choose a future slot, and book it. Then sign in as that doctor to review and accept or reject the request. Sign in as a patient again to see the updated appointment. The admin dashboard can show system counts and manage doctor accounts. Use only the project's approved demo accounts and keep their passwords outside the repository.
+
+Automated tests are optional developer checks. The website does not run tests when a patient opens it, and the test files are not included in the frontend bundle. Keep them in the repository: they document important rules and help catch regressions if the code changes.
+
 ## Seed a development doctor
 
 The development-only seed creates or updates the `demo.doctor@medibook.test` doctor account and linked profile. It never creates an admin account, and it refuses to run when `NODE_ENV=production`. Re-running it reuses the same user/profile, restores the demo details and active state, and updates the password hash from the supplied environment variable.
@@ -101,17 +109,35 @@ Atlas requires both an IP access-list entry and a database user for the applicat
 2. Create the Render service and Vercel project so their production origins are known. Configure the Render server variables and Vercel `VITE_API_BASE_URL` above.
 3. Deploy Render first, then verify `https://<render-service>.onrender.com/api/health` returns `{"status":"ok","service":"medibook-api"}`.
 4. Deploy Vercel. Verify the deployed UI can load the public doctor directory and that login/API requests use the Render URL.
-5. Only after confirming the Render `MONGODB_URI` targets the intended production database, provision the first admin once from a secured operator machine. Do not add bootstrap variables to Render or run the script as a build, pre-deploy, or start command. The script hashes the password and writes the admin plus a persistent one-time bootstrap marker.
+5. Only after confirming the Render `MONGODB_URI` targets the intended production database, provision the first admin once from a secured operator machine. Follow the single bootstrap procedure below. Do not add bootstrap variables to Render or run the script as a build, pre-deploy, or start command.
 
-For the one-time production bootstrap, provide `MONGODB_URI` to the trusted process through your approved secret manager, then run this from the repository root in PowerShell. The password is prompted securely and the production opt-in exists only for that command:
+## Project layout
+
+```text
+client/   React frontend
+server/   Express API, Mongoose connection and models
+docs/     Student guide, architecture, API and handover material
+```
+
+## Status
+
+Patient, doctor, and admin workflows are implemented. Deployment settings are documented above; use the actual configured service URLs in the project presentation and handover.
+
+## Bootstrap the first admin
+
+Public registration always creates a patient. Create the first admin from a trusted machine with database access; this one-time script hashes the password, refuses a second bootstrap, and never prints credentials. It writes a persistent singleton marker in `admin_bootstrap_locks` so concurrent runs cannot provision separate first admins.
+
+This script is for the **first admin only**. It refuses to run if an admin already exists or if its one-time lock has already been claimed. Never delete an existing admin just to rerun bootstrap. In PowerShell from the repository root, supply a private password at the secure prompt. `MONGODB_URI` is read from `server/.env` for local use, or from the process environment when supplied by a trusted production secret manager:
 
 ```powershell
-$env:NODE_ENV = 'production'
-$env:ADMIN_BOOTSTRAP_ALLOW_PRODUCTION = 'true'
-$env:ADMIN_BOOTSTRAP_PRODUCTION_CONFIRMATION = 'CREATE_FIRST_ADMIN_IN_PRODUCTION'
-$env:ADMIN_BOOTSTRAP_NAME = 'MediBook Administrator'
-$env:ADMIN_BOOTSTRAP_EMAIL = 'admin@example.com'
-$securePassword = Read-Host 'Initial admin password' -AsSecureString
+# Production only: set these after confirming the target database and using a secured operator machine.
+# $env:NODE_ENV = 'production'
+# $env:ADMIN_BOOTSTRAP_ALLOW_PRODUCTION = 'true'
+# $env:ADMIN_BOOTSTRAP_PRODUCTION_CONFIRMATION = 'CREATE_FIRST_ADMIN_IN_PRODUCTION'
+
+$securePassword = Read-Host "Initial admin password" -AsSecureString
+$env:ADMIN_BOOTSTRAP_NAME = "MediBook Administrator"
+$env:ADMIN_BOOTSTRAP_EMAIL = "admin@example.test"
 $env:ADMIN_BOOTSTRAP_PASSWORD = [System.Net.NetworkCredential]::new('', $securePassword).Password
 try {
   npm run bootstrap:admin --workspace server
@@ -121,37 +147,4 @@ try {
 }
 ```
 
-Do not place the admin password or production opt-in values in source control, `.env`, Render's persistent environment, or Vercel. The bootstrap is one-time; do not repeat it after the marker has been written.
-
-## Project layout
-
-```text
-client/   React frontend
-server/   Express API, Mongoose connection and models
-docs/     Architecture, schema, API and handover material
-```
-
-## Status
-
-Patient authentication, public doctor discovery, patient appointments, doctor workspace, and admin doctor provisioning are implemented. Deployment remains a required handover milestone.
-
-## Bootstrap the first admin
-
-Public registration always creates a patient. Create the first admin from a trusted machine with database access; this one-time script hashes the password, refuses a second bootstrap, and never prints credentials. It writes a persistent singleton marker in `admin_bootstrap_locks` so concurrent runs cannot provision separate first admins.
-
-In PowerShell from the repository root, supply a private password at the secure prompt and keep it only in the current process environment for this command:
-
-```powershell
-$securePassword = Read-Host "Initial admin password" -AsSecureString
-$env:ADMIN_BOOTSTRAP_NAME = "MediBook Administrator"
-$env:ADMIN_BOOTSTRAP_EMAIL = "admin@example.test"
-$env:ADMIN_BOOTSTRAP_PASSWORD = [System.Net.NetworkCredential]::new('', $securePassword).Password
-try {
-  npm run bootstrap:admin --workspace server
-} finally {
-  Remove-Item Env:ADMIN_BOOTSTRAP_NAME, Env:ADMIN_BOOTSTRAP_EMAIL, Env:ADMIN_BOOTSTRAP_PASSWORD -ErrorAction SilentlyContinue
-  Remove-Variable securePassword -ErrorAction SilentlyContinue
-}
-```
-
-The script reads `MONGODB_URI` from `server/.env` (or the process environment). Keep the admin password out of `.env`, command history, source control, and frontend variables. The bootstrap refuses `NODE_ENV=production` unless the operator deliberately sets both `ADMIN_BOOTSTRAP_ALLOW_PRODUCTION=true` and `ADMIN_BOOTSTRAP_PRODUCTION_CONFIRMATION=CREATE_FIRST_ADMIN_IN_PRODUCTION` for that single command on a secured host. Remove those opt-in variables immediately afterward. The persistent marker prevents reusing the bootstrap; later administrators must be provisioned through an authorized operational process.
+For a deliberate production bootstrap only, set `NODE_ENV=production`, `ADMIN_BOOTSTRAP_ALLOW_PRODUCTION=true`, and `ADMIN_BOOTSTRAP_PRODUCTION_CONFIRMATION=CREATE_FIRST_ADMIN_IN_PRODUCTION` for that single command on a secured operator machine. Supply the production `MONGODB_URI` from a secret manager. Remove all temporary variables immediately afterward. Never put the admin password or production opt-in values in source control, `.env`, Render's persistent environment, or Vercel. Later administrator accounts require a separately authorized operational process.
