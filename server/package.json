@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "test": "node --test",
     "seed:doctor": "node scripts/seedDoctor.js",
-    "bootstrap:admin": "node scripts/bootstrapAdmin.js"
+    "bootstrap:admin": "node scripts/bootstrapAdmin.js",
+    "audit:doctors:readonly": "node scripts/auditDoctorsReadOnly.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

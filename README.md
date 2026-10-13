@@ -52,6 +52,29 @@ Doctor profile credentials such as qualification and medical council registratio
 
 Never commit `.env` files or place secrets in frontend variables; browser code is public. The server reads the variables listed in the deployment section below. The optional local example [`client/.env.example`](client/.env.example) contains only the non-secret local API URL.
 
+## One-time read-only production doctor inventory
+
+`server/scripts/auditDoctorsReadOnly.js` inventories doctor profiles, their linked user accounts, appointment counts by status, and conflicts with `doctor1@gmail.com` through `doctor4@gmail.com`. It makes no writes, does not load `server/.env`, does not import app models, and disables Mongoose auto-creation and auto-indexing. It prints the resolved database name and pauses for an exact-name confirmation before issuing any collection query. The script never selects password hashes or prints the MongoDB URI.
+
+The API's normal database connection calls `mongoose.connect(MONGODB_URI)` without a separate `dbName` option, then initializes model indexes. In that connection pattern the URI's database path selects the database; when no database path or `dbName` option is present, the driver default is `test`. Do not use the local `server/.env` target as evidence of the Render production database. Verify the intended database name in the Render service's `MONGODB_URI` configuration and Atlas before continuing.
+
+Run this once from a secured PowerShell session. Retrieve the production URI from Render or a secret manager without displaying or saving it in source control. The hidden prompt below keeps the URI out of the command text and PowerShell history; the script reads only the temporary process environment variable and ignores `.env` files.
+
+```powershell
+$secureUri = Read-Host "Production MongoDB URI" -AsSecureString
+$uriPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureUri)
+try {
+  $env:MONGODB_URI = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($uriPointer)
+  npm run audit:doctors:readonly --workspace server
+} finally {
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($uriPointer)
+  Remove-Item Env:MONGODB_URI -ErrorAction SilentlyContinue
+  Remove-Variable secureUri, uriPointer -ErrorAction SilentlyContinue
+}
+```
+
+At the prompt, compare the displayed database name with the intended production database in Render and Atlas, then type that exact name to proceed. Any mismatch or non-interactive run stops before collection queries. For strongest protection, supply a temporary Atlas database user with read-only access to this database instead of the application's `readWrite` credential. The report contains doctor names and emails, so keep its output in a secured location and do not paste it into public logs or source control. This is an inventory only; it does not replace or deactivate any account.
+
 ## Deployment (Vercel, Render, MongoDB Atlas)
 
 Deploy the frontend as a Vercel project and the API as a Render **Web Service**. No deployment configuration file is required for the current URL behavior.

@@ -419,7 +419,17 @@ function App() {
                 <p className="eyebrow">MEDIBOOK · DOCTOR APPOINTMENTS</p>
                 <h1>Find care<br /><em>that fits.</em></h1>
                 <p className="hero-description">Search doctor profiles, compare consultation details, and request an appointment that works for you.</p>
-                <a className="hero-scroll" href="#doctor-directory"><span>↓</span> Explore our doctors</a>
+              </div>
+              <div className="hero-search">
+                <h2>Find a doctor</h2>
+                <form className="search-panel" onSubmit={searchDoctors}>
+                  <label className="search-field search-main"><span className="sr-only">Search by doctor or care</span><input aria-label="Search doctors" placeholder="Doctor or care…" value={searchForm.q} onChange={(event) => setSearchForm({ ...searchForm, q: event.target.value })} maxLength={80} /></label>
+                  <label className="search-field search-symptom"><span className="sr-only">Search by symptom</span><input aria-label="Search by symptom" placeholder="Fever, migraine, back pain" value={searchForm.symptom} onChange={(event) => setSearchForm({ ...searchForm, symptom: event.target.value })} maxLength={80} /></label>
+                  <label className="search-field"><span className="sr-only">Specialty filter</span><input aria-label="Filter by specialty" placeholder="Specialty" value={searchForm.specialty} onChange={(event) => setSearchForm({ ...searchForm, specialty: event.target.value })} maxLength={80} /></label>
+                  <label className="search-field fee-field"><span className="fee-prefix">₹</span><span className="sr-only">Maximum consultation fee</span><input aria-label="Maximum consultation fee" inputMode="numeric" type="number" min="0" max="1000000" placeholder="Max fee" value={searchForm.feeMax} onChange={(event) => setSearchForm({ ...searchForm, feeMax: event.target.value })} /></label>
+                  <button className="button button-search" type="submit">Search doctors <span aria-hidden="true">→</span></button>
+                </form>
+                <p className="search-disclaimer">Symptom search helps find profiles by specialty. It does not provide a diagnosis or replace medical advice.</p>
               </div>
               <aside className="emergency-alert" role="alert">For medical emergencies, contact your local emergency services immediately (112/108). Don't wait for an online appointment</aside>
             </section>
@@ -429,14 +439,6 @@ function App() {
                 <div><p className="eyebrow">YOUR NEXT STEP</p><h2>Meet your care team</h2></div>
                 <p>Thoughtful professionals, ready to listen.</p>
               </div>
-              <form className="search-panel" onSubmit={searchDoctors}>
-                <label className="search-field search-main"><span className="sr-only">Search by doctor or care</span><input aria-label="Search doctors" placeholder="Doctor or care…" value={searchForm.q} onChange={(event) => setSearchForm({ ...searchForm, q: event.target.value })} maxLength={80} /></label>
-                <label className="search-field"><span className="sr-only">Search by symptom</span><input aria-label="Search by symptom" placeholder="Fever, migraine, back pain" value={searchForm.symptom} onChange={(event) => setSearchForm({ ...searchForm, symptom: event.target.value })} maxLength={80} /></label>
-                <label className="search-field"><span className="sr-only">Specialty filter</span><input aria-label="Filter by specialty" placeholder="Specialty" value={searchForm.specialty} onChange={(event) => setSearchForm({ ...searchForm, specialty: event.target.value })} maxLength={80} /></label>
-                <label className="search-field fee-field"><span className="fee-prefix">₹</span><span className="sr-only">Maximum consultation fee</span><input aria-label="Maximum consultation fee" inputMode="numeric" type="number" min="0" max="1000000" placeholder="Max fee" value={searchForm.feeMax} onChange={(event) => setSearchForm({ ...searchForm, feeMax: event.target.value })} /></label>
-                <button className="button button-search" type="submit">Search doctors <span aria-hidden="true">→</span></button>
-              </form>
-              <p className="search-disclaimer">Symptom search only helps find profiles by specialty. It does not provide a diagnosis or replace medical advice.</p>
               <div className="results-meta"><span>{directoryStatus === 'ready' ? `${doctorPagination.total} ${doctorPagination.total === 1 ? 'doctor' : 'doctors'} available` : 'Meet your care team'}</span><span>Thoughtful care, one appointment at a time</span></div>
               {directoryStatus === 'loading' && <div className="doctor-grid skeleton-grid" role="status" aria-label="Loading doctor profiles">{[1, 2, 3].map((item) => <div className="doctor-skeleton" key={item}><span /><span /><span /><span /></div>)}</div>}
               {directoryStatus === 'error' && <div className="state-panel state-error" role="alert"><strong>We couldn’t load doctors.</strong><span>{directoryError}</span><button className="button button-outline" type="button" onClick={() => setSearchQuery({ ...searchQuery })}>Try again</button></div>}
