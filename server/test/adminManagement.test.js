@@ -137,10 +137,18 @@ test('user status refuses deactivation when future appointments are active', asy
 
 test('doctor profile update validates fields and persists only supported profile data', async () => {
   const { service, doctor, calls } = harness({ appointmentRows: [] });
-  const result = await service.updateDoctorProfile(ids.doctor, { specialty: '  Pediatrics ', bio: 'Updated bio', consultationFee: 900 });
+  const result = await service.updateDoctorProfile(ids.doctor, {
+    specialty: '  Pediatrics ', bio: 'Updated bio', consultationFee: 900, qualification: 'MBBS', registrationNumber: 'Council ID supplied',
+    languages: ['English', 'Hindi'], clinicAddress: 'OPD 2', isFictionalDemo: true,
+  });
   assert.equal(calls.doctorUpdates[0].update.$set.specialty, 'Pediatrics');
   assert.equal(calls.doctorUpdates[0].update.$set.bio, 'Updated bio');
   assert.equal(calls.doctorUpdates[0].update.$set.consultationFee, 900);
+  assert.equal(calls.doctorUpdates[0].update.$set.qualification, 'MBBS');
+  assert.equal(calls.doctorUpdates[0].update.$set.registrationNumber, 'Council ID supplied');
+  assert.deepEqual(calls.doctorUpdates[0].update.$set.languages, ['English', 'Hindi']);
+  assert.equal(calls.doctorUpdates[0].update.$set.clinicAddress, 'OPD 2');
+  assert.equal(calls.doctorUpdates[0].update.$set.isFictionalDemo, true);
   assert.equal(result.doctor.user.id, ids.doctorUser);
   assert.equal(doctor.specialty, 'Pediatrics');
   await assert.rejects(service.updateDoctorProfile(ids.doctor, { role: 'admin' }), (error) => error.status === 400);

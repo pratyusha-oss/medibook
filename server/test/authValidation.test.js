@@ -51,7 +51,7 @@ test('role middleware blocks a patient from admin-only routes', () => {
 
 test('doctor directory query validates pagination and escapes search text', () => {
   assert.deepEqual(parseDoctorListQuery({ q: '  A+B  ', feeMax: '750', page: '2', limit: '10' }), {
-    value: { q: 'A+B', specialty: '', page: 2, limit: 10, feeMax: 750 },
+    value: { q: 'A+B', specialty: '', symptom: '', page: 2, limit: 10, feeMax: 750 },
   });
   assert.equal(escapeRegex('A+B'), 'A\\+B');
   assert.match(parseDoctorListQuery({ limit: '1000' }).error, /Limit/);

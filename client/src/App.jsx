@@ -9,6 +9,10 @@ function todayString() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
+function todayInZone(timezone) {
+  try { return dateInZone(new Date(), timezone); } catch { return todayString(); }
+}
+
 function dateInZone(instant, timezone) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
@@ -51,6 +55,10 @@ function initials(name = 'MediBook') {
   return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 }
 
+function doctorDisplayName(name = 'Doctor') {
+  return /^dr\.?\s/i.test(name) ? name : `Dr. ${name}`;
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
@@ -58,8 +66,8 @@ function App() {
   const [activePage, setActivePage] = useState('directory');
   const [selectedDoctor, setSelectedDoctor] = useState(null);
 
-  const [searchForm, setSearchForm] = useState({ q: '', specialty: '', feeMax: '' });
-  const [searchQuery, setSearchQuery] = useState({ q: '', specialty: '', feeMax: '' });
+  const [searchForm, setSearchForm] = useState({ q: '', symptom: '', specialty: '', feeMax: '' });
+  const [searchQuery, setSearchQuery] = useState({ q: '', symptom: '', specialty: '', feeMax: '' });
   const [doctors, setDoctors] = useState([]);
   const [doctorPagination, setDoctorPagination] = useState(EMPTY_PAGINATION);
   const [directoryStatus, setDirectoryStatus] = useState('loading');
@@ -72,6 +80,7 @@ function App() {
 
   const [selectedDate, setSelectedDate] = useState(todayString());
   const [slots, setSlots] = useState([]);
+  const [unavailableSlots, setUnavailableSlots] = useState([]);
   const [slotTimezone, setSlotTimezone] = useState('Asia/Kolkata');
   const [slotsStatus, setSlotsStatus] = useState('idle');
   const [slotsError, setSlotsError] = useState('');
@@ -101,6 +110,7 @@ function App() {
     let active = true;
     const params = new URLSearchParams({ page: String(doctorPagination.page || 1), limit: '12' });
     if (searchQuery.q) params.set('q', searchQuery.q);
+    if (searchQuery.symptom) params.set('symptom', searchQuery.symptom);
     if (searchQuery.specialty) params.set('specialty', searchQuery.specialty);
     if (searchQuery.feeMax) params.set('feeMax', searchQuery.feeMax);
     setDirectoryStatus('loading');
@@ -126,6 +136,8 @@ function App() {
     setSlotsStatus('loading');
     setSlotsError('');
     setSelectedSlot('');
+    setSlots([]);
+    setUnavailableSlots([]);
     const range = slotQueryRange(selectedDate);
     const params = new URLSearchParams(range);
     apiRequest(`/doctors/${encodeURIComponent(selectedDoctor.id)}/slots?${params}`)
@@ -133,6 +145,7 @@ function App() {
         if (!active) return;
         setSlotTimezone(data.timezone || 'Asia/Kolkata');
         setSlots((data.slots || []).filter((slot) => dateInZone(slot.startsAt, data.timezone || 'Asia/Kolkata') === selectedDate));
+        setUnavailableSlots((data.unavailableSlots || []).filter((slot) => dateInZone(slot.startsAt, data.timezone || 'Asia/Kolkata') === selectedDate));
         setSlotsStatus('ready');
       })
       .catch((error) => {
@@ -180,16 +193,22 @@ function App() {
 
   async function openDoctor(doctor) {
     setNotice('');
+    setSelectedDoctor(null);
     setSelectedSlot('');
     setSelectedDate(todayString());
     setSlots([]);
+    setUnavailableSlots([]);
     setActivePage('doctor');
     try {
       const response = await apiRequest(`/doctors/${encodeURIComponent(doctor.id)}`);
       setSelectedDoctor(response.doctor);
+      setSlotTimezone(response.doctor.timezone || 'Asia/Kolkata');
+      setSelectedDate(todayInZone(response.doctor.timezone || 'Asia/Kolkata'));
     } catch (error) {
       setNotice(formatApiError(error));
       setSelectedDoctor(doctor);
+      setSlotTimezone(doctor.timezone || 'Asia/Kolkata');
+      setSelectedDate(todayInZone(doctor.timezone || 'Asia/Kolkata'));
     }
   }
 
@@ -308,6 +327,7 @@ function App() {
     setDoctorPagination((pagination) => ({ ...pagination, page: 1 }));
     setSearchQuery({
       q: searchForm.q.trim(),
+      symptom: searchForm.symptom.trim(),
       specialty: searchForm.specialty.trim(),
       feeMax: searchForm.feeMax,
     });
@@ -358,7 +378,7 @@ function App() {
               <span className="mini-icon">✳</span>
               <p className="eyebrow">CARE, MADE PERSONAL</p>
               <h1>Good health starts with a good conversation.</h1>
-              <p>Find trusted care, choose a time that works, and keep everything in one place.</p>
+              <p>Browse doctor profiles, choose a time that works, and keep your appointments in one place.</p>
               <div className="trust-note"><span className="trust-dot" /> Your account is private and secure</div>
             </div>
             <form className="auth-card" onSubmit={submitAuth} noValidate>
@@ -396,25 +416,12 @@ function App() {
           <>
             <section className="hero">
               <div className="hero-copy">
-                <p className="eyebrow"><span className="eyebrow-line" /> THOUGHTFUL CARE, CLOSER TO YOU</p>
-                <h1>Care that fits<br /><em>your life.</em></h1>
-                <p className="hero-description">Find the right doctor and book a time that works for you. A calmer way to take care of yourself.</p>
+                <p className="eyebrow">MEDIBOOK · DOCTOR APPOINTMENTS</p>
+                <h1>Find care<br /><em>that fits.</em></h1>
+                <p className="hero-description">Search doctor profiles, compare consultation details, and request an appointment that works for you.</p>
                 <a className="hero-scroll" href="#doctor-directory"><span>↓</span> Explore our doctors</a>
               </div>
-              <div className="hero-art" aria-hidden="true">
-                <div className="hero-orbit orbit-one" />
-                <div className="hero-orbit orbit-two" />
-                <div className="hero-cross">+</div>
-                <div className="hero-note note-top"><span className="note-dot" /> Care, on your terms</div>
-                <div className="doctor-illustration">
-                  <div className="illustration-hair" />
-                  <div className="illustration-face"><span className="face-eye eye-left" /><span className="face-eye eye-right" /><span className="face-smile" /></div>
-                  <div className="illustration-neck" />
-                  <div className="illustration-coat"><span className="coat-lapel" /><span className="coat-pocket" /><span className="coat-stethoscope" /></div>
-                </div>
-                <div className="hero-note note-bottom"><span className="verified-mark">✓</span><div><strong>Here for your health</strong><small>Care you can feel good about</small></div></div>
-              </div>
-              <div className="hero-index"><span>01</span><i /> Find · Choose · Feel better</div>
+              <aside className="emergency-alert" role="alert">For medical emergencies, contact your local emergency services immediately (112/108). Don't wait for an online appointment</aside>
             </section>
 
             <section className="directory-section" id="doctor-directory">
@@ -423,15 +430,17 @@ function App() {
                 <p>Thoughtful professionals, ready to listen.</p>
               </div>
               <form className="search-panel" onSubmit={searchDoctors}>
-                <label className="search-field search-main"><span aria-hidden="true">⌕</span><span className="sr-only">Search by doctor, specialty, or care</span><input aria-label="Search doctors" placeholder="Doctor, specialty, or care…" value={searchForm.q} onChange={(event) => setSearchForm({ ...searchForm, q: event.target.value })} maxLength={80} /></label>
+                <label className="search-field search-main"><span className="sr-only">Search by doctor or care</span><input aria-label="Search doctors" placeholder="Doctor or care…" value={searchForm.q} onChange={(event) => setSearchForm({ ...searchForm, q: event.target.value })} maxLength={80} /></label>
+                <label className="search-field"><span className="sr-only">Search by symptom</span><input aria-label="Search by symptom" placeholder="Fever, migraine, back pain" value={searchForm.symptom} onChange={(event) => setSearchForm({ ...searchForm, symptom: event.target.value })} maxLength={80} /></label>
                 <label className="search-field"><span className="sr-only">Specialty filter</span><input aria-label="Filter by specialty" placeholder="Specialty" value={searchForm.specialty} onChange={(event) => setSearchForm({ ...searchForm, specialty: event.target.value })} maxLength={80} /></label>
                 <label className="search-field fee-field"><span className="fee-prefix">₹</span><span className="sr-only">Maximum consultation fee</span><input aria-label="Maximum consultation fee" inputMode="numeric" type="number" min="0" max="1000000" placeholder="Max fee" value={searchForm.feeMax} onChange={(event) => setSearchForm({ ...searchForm, feeMax: event.target.value })} /></label>
                 <button className="button button-search" type="submit">Search doctors <span aria-hidden="true">→</span></button>
               </form>
+              <p className="search-disclaimer">Symptom search only helps find profiles by specialty. It does not provide a diagnosis or replace medical advice.</p>
               <div className="results-meta"><span>{directoryStatus === 'ready' ? `${doctorPagination.total} ${doctorPagination.total === 1 ? 'doctor' : 'doctors'} available` : 'Meet your care team'}</span><span>Thoughtful care, one appointment at a time</span></div>
-              {directoryStatus === 'loading' && <div className="state-panel" role="status"><span className="spinner" /> Finding your care team…</div>}
+              {directoryStatus === 'loading' && <div className="doctor-grid skeleton-grid" role="status" aria-label="Loading doctor profiles">{[1, 2, 3].map((item) => <div className="doctor-skeleton" key={item}><span /><span /><span /><span /></div>)}</div>}
               {directoryStatus === 'error' && <div className="state-panel state-error" role="alert"><strong>We couldn’t load doctors.</strong><span>{directoryError}</span><button className="button button-outline" type="button" onClick={() => setSearchQuery({ ...searchQuery })}>Try again</button></div>}
-              {directoryStatus === 'ready' && doctors.length === 0 && <div className="state-panel empty-state"><span className="empty-symbol">⌕</span><strong>No doctors match those filters yet.</strong><span>Try another specialty or clear the fee limit.</span><button className="button button-outline" type="button" onClick={() => { setSearchForm({ q: '', specialty: '', feeMax: '' }); setSearchQuery({ q: '', specialty: '', feeMax: '' }); }}>Clear filters</button></div>}
+              {directoryStatus === 'ready' && doctors.length === 0 && <div className="state-panel empty-state"><strong>No doctors match those filters yet.</strong><span>Try another symptom, specialty, or fee limit.</span><button className="button button-outline" type="button" onClick={() => { const empty = { q: '', symptom: '', specialty: '', feeMax: '' }; setSearchForm(empty); setSearchQuery(empty); }}>Clear filters</button></div>}
               {directoryStatus === 'ready' && doctors.length > 0 && (
                 <div className="doctor-grid">
                   {doctors.map((doctor, index) => <DoctorCard key={doctor.id} doctor={doctor} index={index} onOpen={() => openDoctor(doctor)} />)}
@@ -449,20 +458,25 @@ function App() {
               <div className="profile-main">
                 <div className="profile-hero-card">
                   <div className="profile-avatar">{initials(selectedDoctor.name)}</div>
-                  <div className="profile-identity"><span className="eyebrow">YOUR CARE, YOUR WAY</span><h1>Dr. {selectedDoctor.name}</h1><span className="specialty-pill">{selectedDoctor.specialty}</span></div>
+                  <div className="profile-identity"><span className="eyebrow">DOCTOR PROFILE</span><h1>{doctorDisplayName(selectedDoctor.name)}</h1><span className="specialty-pill">{selectedDoctor.specialty}</span>{selectedDoctor.isFictionalDemo && <span className="fictional-label">Fictional demonstration profile</span>}</div>
                   <div className="profile-fee"><small>Consultation</small><strong>₹{Number(selectedDoctor.consultationFee).toLocaleString('en-IN')}</strong><small>per visit</small></div>
                 </div>
+                <div className="profile-details"><dl>{selectedDoctor.qualification && <div><dt>Professional qualification</dt><dd>{selectedDoctor.qualification}</dd></div>}{selectedDoctor.registrationNumber && <div><dt>Registration number</dt><dd>{selectedDoctor.registrationNumber}</dd></div>}{selectedDoctor.languages?.length > 0 && <div><dt>Languages</dt><dd>{selectedDoctor.languages.join(', ')}</dd></div>}{selectedDoctor.clinicAddress && <div><dt>Clinic / OPD</dt><dd>{selectedDoctor.clinicAddress}</dd></div>}</dl><p>Professional credentials shown here are supplied by the profile owner and are not independently verified by MediBook.</p></div>
                 <div className="profile-about"><p className="eyebrow">A LITTLE ABOUT</p><h2>Care starts with listening.</h2><p>{selectedDoctor.bio || 'This doctor has not added a biography yet. Browse availability to find a time that works for you.'}</p></div>
-                <div className="availability-list"><div><p className="eyebrow">WEEKLY AVAILABILITY</p><h2>When this doctor sees patients</h2></div>{selectedDoctor.availability?.length ? <ul>{selectedDoctor.availability.map((window, index) => <li key={`${window.weekday}-${window.startTime}-${index}`}><strong>{weekdayName(window.weekday)}</strong><span>{window.startTime}–{window.endTime}</span></li>)}</ul> : <p className="muted">No weekly availability has been added yet.</p>}</div>
+                <div className="availability-list"><div><p className="eyebrow">WEEKLY AVAILABILITY</p><h2>When this doctor sees patients</h2><p className="muted">Local times · {selectedDoctor.timezone || 'Asia/Kolkata'}</p></div>{selectedDoctor.availability?.length ? <ul>{selectedDoctor.availability.map((window, index) => <li key={`${window.weekday}-${window.startTime}-${index}`}><strong>{weekdayName(window.weekday)}</strong><span>{window.startTime}–{window.endTime}</span></li>)}</ul> : <p className="muted">No weekly availability has been added yet.</p>}</div>
               </div>
               <aside className="booking-card" aria-labelledby="booking-title">
                 <p className="eyebrow">TAKE THE NEXT STEP</p><h2 id="booking-title">Book a visit</h2><p className="muted">Choose a day to see available appointment times.</p>
-                <label className="field">Appointment date<input type="date" min={todayString()} value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
+                <div className="emergency-alert" role="alert">For medical emergencies, contact your local emergency services immediately (112/108). Don't wait for an online appointment</div>
+                <label className="field">Appointment date<input type="date" min={todayInZone(slotTimezone)} value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
                 <div className="timezone-label">Times shown in <strong>{slotTimezone}</strong></div>
-                {slotsStatus === 'loading' && <div className="slot-state" role="status"><span className="spinner" /> Checking availability…</div>}
+                {slotsStatus === 'loading' && <div className="slot-grid slot-skeleton" role="status" aria-label="Loading appointment times">{[1, 2, 3, 4, 5, 6].map((item) => <span key={item} />)}</div>}
                 {slotsStatus === 'error' && <p className="form-error" role="alert">{slotsError}</p>}
-                {slotsStatus === 'ready' && slots.length === 0 && <div className="no-slots">No available times on this day. Please choose another date.</div>}
-                {slotsStatus === 'ready' && slots.length > 0 && <div className="slot-grid" aria-label="Available appointment times">{slots.map((slot) => <button type="button" key={slot.startsAt} className={selectedSlot === slot.startsAt ? 'slot-button selected' : 'slot-button'} onClick={() => setSelectedSlot(slot.startsAt)} aria-pressed={selectedSlot === slot.startsAt}>{timeInZone(slot.startsAt, slotTimezone)}</button>)}</div>}
+                {slotsStatus === 'ready' && slots.length === 0 && unavailableSlots.length > 0 && <div className="no-slots">No appointments available on this date. All listed times are already booked.</div>}
+                {slotsStatus === 'ready' && slots.length === 0 && unavailableSlots.length === 0 && <div className="no-slots">No appointments available on this date. This doctor has no available hours listed for the selected date.</div>}
+                {slotsStatus === 'ready' && (slots.length > 0 || unavailableSlots.length > 0) && <><div className="slot-grid" aria-label="Appointment times">{[...slots.map((slot) => ({ ...slot, unavailable: false })), ...unavailableSlots.map((slot) => ({ ...slot, unavailable: true }))].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)).map((slot) => slot.unavailable
+                  ? <button type="button" key={slot.startsAt} className="slot-button unavailable" disabled title="Already booked" aria-label={`${timeInZone(slot.startsAt, slotTimezone)}, already booked`}>{timeInZone(slot.startsAt, slotTimezone)}</button>
+                  : <button type="button" key={slot.startsAt} className={selectedSlot === slot.startsAt ? 'slot-button selected' : 'slot-button'} onClick={() => setSelectedSlot(slot.startsAt)} aria-pressed={selectedSlot === slot.startsAt}>{timeInZone(slot.startsAt, slotTimezone)}</button>)}</div><p className="slot-help">Unavailable times are disabled and labelled “Already booked”.</p></>}
                 {selectedSlot && <form className="booking-form" onSubmit={bookSelectedSlot}>
                   <label className="field">What would you like help with? <span className="optional-label">Optional</span><textarea rows="3" maxLength={500} placeholder="A short note for the doctor" value={reason} onChange={(event) => setReason(event.target.value)} /></label>
                   <button className="button button-primary button-full" type="submit" disabled={booking}>{booking ? 'Requesting…' : user?.role === 'patient' ? 'Request appointment' : 'Sign in to continue'} <span aria-hidden="true">→</span></button>
@@ -472,6 +486,8 @@ function App() {
             </div>
           </section>
         )}
+
+        {!authMode && activePage === 'doctor' && !selectedDoctor && <section className="profile-page profile-loading" role="status" aria-label="Loading doctor profile"><div className="profile-skeleton"><span /><span /><span /><span /></div><div className="booking-skeleton"><span /><span /><span /><span /></div></section>}
 
         {!authMode && activePage === 'appointments' && (
           <section className="appointments-page">
@@ -485,7 +501,7 @@ function App() {
               const canCancel = ['requested', 'accepted'].includes(appointment.status) && new Date(appointment.startsAt) > new Date();
               return <article className="appointment-card" key={appointment.id}>
                 <div className="appointment-date"><span>{longDate(appointment.startsAt, doctor?.timezone || undefined)}</span><strong>{timeInZone(appointment.startsAt, doctor?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)}</strong><small>{Math.round((new Date(appointment.endsAt) - new Date(appointment.startsAt)) / 60000)} min visit</small></div>
-                <div className="appointment-doctor"><div className="doctor-avatar avatar-small">{initials(doctor?.name || 'Doctor')}</div><div><strong>{doctor?.name ? `Dr. ${doctor.name}` : 'Doctor profile unavailable'}</strong><span>{doctor?.specialty || `Doctor ID · ${appointment.doctorId.slice(-6)}`}</span>{appointment.reason && <small>“{appointment.reason}”</small>}</div></div>
+                <div className="appointment-doctor"><div className="doctor-avatar avatar-small">{initials(doctor?.name || 'Doctor')}</div><div><strong>{doctor?.name ? doctorDisplayName(doctor.name) : 'Doctor profile unavailable'}</strong><span>{doctor?.specialty || `Doctor ID · ${appointment.doctorId.slice(-6)}`}</span>{appointment.reason && <small>“{appointment.reason}”</small>}</div></div>
                 <div className="appointment-actions"><span className={`status-badge status-${appointment.status}`}>{appointment.status}</span>{canCancel && <button className="button button-cancel" type="button" disabled={cancellingId === appointment.id} onClick={() => cancelAppointment(appointment.id)}>{cancellingId === appointment.id ? 'Cancelling…' : 'Cancel visit'}</button>}</div>
               </article>;
             })}</div>}
@@ -508,8 +524,8 @@ function weekdayName(day) {
 function DoctorCard({ doctor, index, onOpen }) {
   return <article className={`doctor-card card-tone-${index % 4}`}>
     <div className="card-topline"><span className="specialty-pill">{doctor.specialty}</span><span className="card-symbol" aria-hidden="true">✳</span></div>
-    <div className="doctor-card-person"><div className="doctor-avatar">{initials(doctor.name)}</div><div><h3>Dr. {doctor.name}</h3><span className="doctor-specialty-caption">{doctor.specialty}</span></div></div>
-    <p className="doctor-bio">{doctor.bio || 'A compassionate professional, ready to listen and help you feel your best.'}</p>
+    <div className="doctor-card-person"><div className="doctor-avatar">{initials(doctor.name)}</div><div><h3>{doctorDisplayName(doctor.name)}</h3><span className="doctor-specialty-caption">{doctor.specialty}</span>{doctor.isFictionalDemo && <small className="fictional-label">Fictional demonstration profile</small>}</div></div>
+    <p className="doctor-bio">{doctor.bio || 'Open this profile to view professional details and appointment availability.'}</p>
     <div className="doctor-card-bottom"><div className="fee-display"><small>Consultation</small><strong>₹{Number(doctor.consultationFee).toLocaleString('en-IN')}</strong></div><button className="button button-card" type="button" onClick={onOpen}>View profile <span aria-hidden="true">↗</span></button></div>
   </article>;
 }
@@ -555,7 +571,7 @@ function DoctorDashboard() {
   const [availabilityError, setAvailabilityError] = useState('');
   const [availabilityConflicts, setAvailabilityConflicts] = useState([]);
   const [editingProfile, setEditingProfile] = useState(false);
-  const [profileDraft, setProfileDraft] = useState({ specialty: '', bio: '', consultationFee: '' });
+  const [profileDraft, setProfileDraft] = useState({ specialty: '', bio: '', consultationFee: '', qualification: '', registrationNumber: '', languages: '', clinicAddress: '' });
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileError, setProfileError] = useState('');
 
@@ -602,7 +618,7 @@ function DoctorDashboard() {
   }
 
   function beginProfileEdit() {
-    setProfileDraft({ specialty: doctor.specialty || '', bio: doctor.bio || '', consultationFee: String(doctor.consultationFee ?? '') });
+    setProfileDraft({ specialty: doctor.specialty || '', bio: doctor.bio || '', consultationFee: String(doctor.consultationFee ?? ''), qualification: doctor.qualification || '', registrationNumber: doctor.registrationNumber || '', languages: (doctor.languages || []).join(', '), clinicAddress: doctor.clinicAddress || '' });
     setProfileError('');
     setEditingProfile(true);
   }
@@ -614,11 +630,14 @@ function DoctorDashboard() {
     if (!profileDraft.specialty.trim() || profileDraft.specialty.trim().length > 80) return setProfileError('Specialty must be between 1 and 80 characters.');
     if (!Number.isFinite(consultationFee) || consultationFee < 0 || consultationFee > 1000000) return setProfileError('Enter a consultation fee from ₹0 to ₹10,00,000.');
     if (profileDraft.bio.length > 2000) return setProfileError('Biography must be 2000 characters or fewer.');
+    if (profileDraft.qualification.length > 180 || profileDraft.registrationNumber.length > 100 || profileDraft.clinicAddress.length > 300) return setProfileError('Check the length of the qualification, registration number, or clinic address.');
     setSavingProfile(true);
     setNotice('');
     try {
       const response = await apiRequest('/doctor/me/profile', { method: 'PATCH', body: JSON.stringify({
         specialty: profileDraft.specialty.trim(), bio: profileDraft.bio.trim(), consultationFee,
+        qualification: profileDraft.qualification.trim(), registrationNumber: profileDraft.registrationNumber.trim(),
+        languages: profileDraft.languages.split(',').map((language) => language.trim()).filter(Boolean), clinicAddress: profileDraft.clinicAddress.trim(),
       }) });
       setDoctor(response.doctor);
       setEditingProfile(false);
@@ -722,10 +741,12 @@ function DoctorDashboard() {
 
           <section className="availability-panel doctor-profile-editor" aria-labelledby="doctor-profile-title">
             <div className="doctor-panel-heading"><div><p className="eyebrow">PUBLIC DIRECTORY DETAILS</p><h2 id="doctor-profile-title">Your profile</h2></div><button className="button button-outline" type="button" onClick={editingProfile ? () => setEditingProfile(false) : beginProfileEdit}>{editingProfile ? 'Cancel editing' : 'Edit profile'}</button></div>
-            {!editingProfile && <div className="doctor-profile-summary"><strong>Dr. {doctor.name}</strong><span>{doctor.specialty} · ₹{Number(doctor.consultationFee).toLocaleString('en-IN')} consultation</span><p>{doctor.bio || 'No biography added.'}</p></div>}
+            {!editingProfile && <div className="doctor-profile-summary"><strong>{doctorDisplayName(doctor.name)}</strong><span>{doctor.specialty} · ₹{Number(doctor.consultationFee).toLocaleString('en-IN')} consultation</span><p>{doctor.bio || 'No biography added.'}</p><p>{[doctor.qualification, doctor.registrationNumber, doctor.clinicAddress, doctor.languages?.join(', ')].filter(Boolean).join(' · ') || 'Add professional profile details to help patients understand your practice.'}</p>{doctor.isFictionalDemo && <span className="fictional-label">Fictional demonstration profile</span>}</div>}
             {editingProfile && <form onSubmit={saveProfile}>
               <div className="admin-form-grid"><label className="field">Specialty<input value={profileDraft.specialty} maxLength={80} onChange={(event) => setProfileDraft({ ...profileDraft, specialty: event.target.value })} required /></label><label className="field">Consultation fee (₹)<input type="number" min="0" max="1000000" step="1" value={profileDraft.consultationFee} onChange={(event) => setProfileDraft({ ...profileDraft, consultationFee: event.target.value })} required /></label></div>
+              <div className="admin-form-grid"><label className="field">Professional qualification<input value={profileDraft.qualification} maxLength={180} onChange={(event) => setProfileDraft({ ...profileDraft, qualification: event.target.value })} /></label><label className="field">NMC / state council registration number<input value={profileDraft.registrationNumber} maxLength={100} onChange={(event) => setProfileDraft({ ...profileDraft, registrationNumber: event.target.value })} /></label><label className="field">Languages spoken<input value={profileDraft.languages} maxLength={500} placeholder="English, Hindi" onChange={(event) => setProfileDraft({ ...profileDraft, languages: event.target.value })} /></label><label className="field">Clinic address / OPD room<input value={profileDraft.clinicAddress} maxLength={300} onChange={(event) => setProfileDraft({ ...profileDraft, clinicAddress: event.target.value })} /></label></div>
               <label className="field">Biography<textarea rows="3" maxLength={2000} value={profileDraft.bio} onChange={(event) => setProfileDraft({ ...profileDraft, bio: event.target.value })} /></label>
+              <p className="credential-note">Enter only details you can substantiate. MediBook does not independently verify credentials.</p>
               {profileError && <p className="form-error" role="alert">{profileError}</p>}
               <button className="button button-primary" type="submit" disabled={savingProfile}>{savingProfile ? 'Saving profile…' : 'Save profile'}</button>
             </form>}

@@ -218,6 +218,19 @@ test('doctor can update only safe fields on the linked profile', async () => {
   await assert.rejects(service.updateProfile(doctorUserId, { role: 'admin' }), (error) => error.status === 400 && error.code === 'INVALID_PROFILE');
 });
 
+test('doctor can update supported profile details but cannot claim demo status or submit invalid language values', async () => {
+  const models = fakeModels();
+  const service = createDoctorDashboardService({ ...models, clock: () => now });
+  await service.updateProfile(doctorUserId, {
+    qualification: 'MBBS', registrationNumber: 'Provided council ID', languages: ['English', 'Hindi'], clinicAddress: 'OPD 2',
+  });
+  assert.deepEqual(models.calls.profileUpdate.update.$set, {
+    qualification: 'MBBS', registrationNumber: 'Provided council ID', languages: ['English', 'Hindi'], clinicAddress: 'OPD 2',
+  });
+  await assert.rejects(service.updateProfile(doctorUserId, { languages: 'English, Hindi' }), (error) => error.status === 400);
+  await assert.rejects(service.updateProfile(doctorUserId, { isFictionalDemo: false }), (error) => error.status === 400);
+});
+
 test('availability update reports future booking conflicts and leaves profile unchanged', async () => {
   const models = fakeModels({ appointments: [scheduledAppointment] });
   const service = createDoctorDashboardService({ ...models, clock: () => now });

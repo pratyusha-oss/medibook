@@ -106,6 +106,34 @@ test('slot generation omits active overlapping bookings and past slots', () => {
   assert.deepEqual(slots.map((slot) => slot.startsAt.toISOString()), []);
 });
 
+test('slot endpoint distinguishes booked slots, uses doctor local timezone and excludes past dates', async () => {
+  const bookedStart = new Date('2026-10-12T03:30:00.000Z');
+  const models = fakeModels({ bookings: [{ startsAt: bookedStart, endsAt: new Date('2026-10-12T04:00:00.000Z') }] });
+  const service = createAppointmentService({ ...models, clock: () => now });
+  const result = await service.getDoctorSlots(doctorId, {
+    from: '2026-10-12T00:00:00.000Z', to: '2026-10-13T00:00:00.000Z',
+  });
+  assert.equal(result.timezone, 'Asia/Kolkata');
+  assert.deepEqual(result.slots.map((slot) => slot.startsAt.toISOString()), ['2026-10-12T04:00:00.000Z']);
+  assert.deepEqual(result.unavailableSlots.map((slot) => [slot.startsAt.toISOString(), slot.reason]), [['2026-10-12T03:30:00.000Z', 'booked']]);
+
+  const fullyBookedService = createAppointmentService({ ...fakeModels({ bookings: [
+    { startsAt: new Date('2026-10-12T03:30:00.000Z'), endsAt: new Date('2026-10-12T04:00:00.000Z') },
+    { startsAt: new Date('2026-10-12T04:00:00.000Z'), endsAt: new Date('2026-10-12T04:30:00.000Z') },
+  ] }), clock: () => now });
+  const fullyBooked = await fullyBookedService.getDoctorSlots(doctorId, {
+    from: '2026-10-12T00:00:00.000Z', to: '2026-10-13T00:00:00.000Z',
+  });
+  assert.deepEqual(fullyBooked.slots, []);
+  assert.equal(fullyBooked.unavailableSlots.length, 2);
+
+  const past = await service.getDoctorSlots(doctorId, {
+    from: '2026-10-05T00:00:00.000Z', to: '2026-10-06T00:00:00.000Z',
+  });
+  assert.deepEqual(past.slots, []);
+  assert.deepEqual(past.unavailableSlots, []);
+});
+
 test('invalid or unavailable slots are rejected and client end times are ignored', async () => {
   const models = fakeModels();
   const service = createAppointmentService({ ...models, clock: () => now });

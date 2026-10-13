@@ -15,6 +15,11 @@ const doctorSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', unique: true, required: true },
     specialty: { type: String, required: true, trim: true, maxlength: 80 },
+    qualification: { type: String, default: '', trim: true, maxlength: 180 },
+    registrationNumber: { type: String, default: '', trim: true, maxlength: 100 },
+    languages: { type: [{ type: String, trim: true, maxlength: 50 }], default: [] },
+    clinicAddress: { type: String, default: '', trim: true, maxlength: 300 },
+    isFictionalDemo: { type: Boolean, default: false },
     consultationFee: { type: Number, required: true, min: 0 },
     bio: { type: String, default: '', trim: true, maxlength: 2000 },
     timezone: {

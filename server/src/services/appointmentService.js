@@ -276,10 +276,27 @@ export function createAppointmentService({ Doctor, Appointment, clock = () => ne
     const now = clock();
     const { from, to } = parseDateRange(query, now);
     const doctor = await findActiveDoctor(doctorId);
+    const bookings = await Appointment.find({
+      doctor: doctor._id,
+      status: { $in: ACTIVE_APPOINTMENT_STATUSES },
+      startsAt: { $lt: to },
+      endsAt: { $gt: from },
+    }).select('startsAt endsAt');
+    const candidates = generateSlots({
+      availability: doctor.availability,
+      timezone: doctor.timezone || DEFAULT_TIME_ZONE,
+      from,
+      to,
+      now,
+    });
+    const isBooked = (slot) => bookings.some((booking) =>
+      new Date(booking.startsAt) < slot.endsAt && new Date(booking.endsAt) > slot.startsAt,
+    );
     return {
       doctor,
       timezone: doctor.timezone || DEFAULT_TIME_ZONE,
-      slots: await availableSlotsForDoctor(doctor, from, to),
+      slots: candidates.filter((slot) => !isBooked(slot)),
+      unavailableSlots: candidates.filter(isBooked).map((slot) => ({ ...slot, reason: 'booked' })),
     };
   }
 

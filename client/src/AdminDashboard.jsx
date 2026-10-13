@@ -72,7 +72,7 @@ function DoctorSection({ onDataChange }) {
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', specialty: '', consultationFee: '', bio: '', timezone: 'Asia/Kolkata', days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '17:00' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', specialty: '', consultationFee: '', bio: '', qualification: '', registrationNumber: '', languages: '', clinicAddress: '', isFictionalDemo: false, timezone: 'Asia/Kolkata', days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '17:00' });
 
   useEffect(() => {
     let active = true;
@@ -103,7 +103,9 @@ function DoctorSection({ onDataChange }) {
     try {
       const response = await apiRequest('/admin/doctors', { method: 'POST', body: JSON.stringify({
         name: form.name.trim(), email: form.email.trim(), password: form.password, specialty: form.specialty.trim(), consultationFee: fee,
-        bio: form.bio.trim(), timezone: form.timezone.trim(), availability: form.days.map((weekday) => ({ weekday, startTime: form.startTime, endTime: form.endTime })),
+        bio: form.bio.trim(), qualification: form.qualification.trim(), registrationNumber: form.registrationNumber.trim(),
+        languages: form.languages.split(',').map((language) => language.trim()).filter(Boolean), clinicAddress: form.clinicAddress.trim(), isFictionalDemo: form.isFictionalDemo,
+        timezone: form.timezone.trim(), availability: form.days.map((weekday) => ({ weekday, startTime: form.startTime, endTime: form.endTime })),
       }) });
       setForm((current) => ({ ...current, name: '', email: '', password: '', specialty: '', consultationFee: '', bio: '' }));
       setMessage(`Doctor account created for ${response.doctor.user.name}. Share the temporary password through a secure channel.`);
@@ -128,6 +130,8 @@ function DoctorSection({ onDataChange }) {
     try {
       await apiRequest(`/admin/doctors/${encodeURIComponent(editing.id)}`, { method: 'PATCH', body: JSON.stringify({
         specialty: editing.specialty, bio: editing.bio, consultationFee: Number(editing.consultationFee),
+        qualification: editing.qualification || '', registrationNumber: editing.registrationNumber || '', languages: editing.languages || [],
+        clinicAddress: editing.clinicAddress || '', isFictionalDemo: Boolean(editing.isFictionalDemo),
       }) });
       setMessage(`Profile updated for ${editing.user.name}.`); setEditing(null); setRefresh((value) => value + 1); onDataChange();
     } catch (issue) { setError(formatApiError(issue)); }
@@ -145,8 +149,14 @@ function DoctorSection({ onDataChange }) {
           <label className="field">Specialty<input value={form.specialty} onChange={(event) => update('specialty', event.target.value)} maxLength={80} required /></label>
           <label className="field">Consultation fee (₹)<input type="number" min="0" max="1000000" step="1" value={form.consultationFee} onChange={(event) => update('consultationFee', event.target.value)} required /></label>
           <label className="field">IANA timezone<input value={form.timezone} onChange={(event) => update('timezone', event.target.value)} placeholder="Asia/Kolkata" required /></label>
+          <label className="field">Professional qualification<input value={form.qualification} maxLength={180} onChange={(event) => update('qualification', event.target.value)} /></label>
+          <label className="field">NMC / state council registration number<input value={form.registrationNumber} maxLength={100} onChange={(event) => update('registrationNumber', event.target.value)} /></label>
+          <label className="field">Languages spoken<input value={form.languages} maxLength={500} placeholder="English, Hindi" onChange={(event) => update('languages', event.target.value)} /></label>
+          <label className="field">Clinic address / OPD room<input value={form.clinicAddress} maxLength={300} onChange={(event) => update('clinicAddress', event.target.value)} /></label>
         </div>
         <label className="field">Profile biography<textarea rows="3" maxLength={2000} value={form.bio} onChange={(event) => update('bio', event.target.value)} /></label>
+        <label className="admin-demo-checkbox"><input type="checkbox" checked={form.isFictionalDemo} onChange={(event) => update('isFictionalDemo', event.target.checked)} /> This is a fictional demonstration profile</label>
+        <p className="credential-note">Enter only details supplied for this project. MediBook does not independently verify credentials.</p>
         <fieldset className="admin-days"><legend>Weekly working days</legend><div>{['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, weekday) => <label key={day}><input type="checkbox" checked={form.days.includes(weekday)} onChange={(event) => update('days', event.target.checked ? [...form.days, weekday].sort((a, b) => a - b) : form.days.filter((value) => value !== weekday))} />{day.slice(0, 3)}</label>)}</div></fieldset>
         <div className="admin-form-grid admin-hours"><label className="field">Start time<input type="time" value={form.startTime} onChange={(event) => update('startTime', event.target.value)} required /></label><label className="field">End time<input type="time" value={form.endTime} onChange={(event) => update('endTime', event.target.value)} required /></label></div>
         <button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Creating doctor account…' : 'Create doctor account'}</button>
@@ -155,7 +165,10 @@ function DoctorSection({ onDataChange }) {
 
     {editing && <section className="availability-panel admin-create-panel"><h3>Edit Dr. {editing.user.name}</h3><form onSubmit={saveProfile}>
       <div className="admin-form-grid"><label className="field">Specialty<input value={editing.specialty} maxLength={80} onChange={(event) => setEditing({ ...editing, specialty: event.target.value })} required /></label><label className="field">Consultation fee (₹)<input type="number" min="0" max="1000000" value={editing.consultationFee} onChange={(event) => setEditing({ ...editing, consultationFee: event.target.value })} required /></label></div>
+      <div className="admin-form-grid"><label className="field">Professional qualification<input value={editing.qualification || ''} maxLength={180} onChange={(event) => setEditing({ ...editing, qualification: event.target.value })} /></label><label className="field">NMC / state council registration number<input value={editing.registrationNumber || ''} maxLength={100} onChange={(event) => setEditing({ ...editing, registrationNumber: event.target.value })} /></label><label className="field">Languages spoken<input value={(editing.languages || []).join(', ')} maxLength={500} onChange={(event) => setEditing({ ...editing, languages: event.target.value.split(',').map((language) => language.trim()).filter(Boolean) })} /></label><label className="field">Clinic address / OPD room<input value={editing.clinicAddress || ''} maxLength={300} onChange={(event) => setEditing({ ...editing, clinicAddress: event.target.value })} /></label></div>
       <label className="field">Biography<textarea rows="3" maxLength={2000} value={editing.bio || ''} onChange={(event) => setEditing({ ...editing, bio: event.target.value })} /></label>
+      <label className="admin-demo-checkbox"><input type="checkbox" checked={Boolean(editing.isFictionalDemo)} onChange={(event) => setEditing({ ...editing, isFictionalDemo: event.target.checked })} /> This is a fictional demonstration profile</label>
+      <p className="credential-note">MediBook does not independently verify credentials.</p>
       <div className="admin-inline-actions"><button className="button button-primary" type="submit" disabled={editSaving}>{editSaving ? 'Saving…' : 'Save profile'}</button><button className="button button-outline" type="button" onClick={() => setEditing(null)}>Cancel</button></div>
     </form></section>}
 
@@ -208,7 +221,7 @@ function AppointmentsSection({ doctors, refreshKey }) {
     </form>
     {state !== 'ready' && <LoadState state={state} error={error} retry={() => setRetry((value) => value + 1)} />}
     {state === 'ready' && appointments.length === 0 && <LoadState state="ready" empty />}
-    {state === 'ready' && appointments.length > 0 && <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>When</th><th>Patient</th><th>Doctor</th><th>Reason</th><th>Status</th></tr></thead><tbody>{appointments.map((appointment) => <tr key={appointment.id}><td data-label="When">{displayDate(appointment.startsAt)}</td><td data-label="Patient">{appointment.patient?.name || 'Patient'}</td><td data-label="Doctor">{appointment.doctor?.name ? `Dr. ${appointment.doctor.name}` : 'Doctor'}<small>{appointment.doctor?.specialty || ''}</small></td><td data-label="Reason">{appointment.reason || '—'}</td><td data-label="Status"><span className={`status-badge status-${appointment.status}`}>{appointment.status}</span></td></tr>)}</tbody></table></div>}
+    {state === 'ready' && appointments.length > 0 && <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>When</th><th>Patient</th><th>Doctor</th><th>Reason</th><th>Status</th></tr></thead><tbody>{appointments.map((appointment) => <tr key={appointment.id}><td data-label="When">{displayDate(appointment.startsAt)}</td><td data-label="Patient">{appointment.patient?.name || 'Patient'}</td><td data-label="Doctor">{appointment.doctor?.name ? (/^dr\.?\s/i.test(appointment.doctor.name) ? appointment.doctor.name : `Dr. ${appointment.doctor.name}`) : 'Doctor'}<small>{appointment.doctor?.specialty || ''}</small></td><td data-label="Reason">{appointment.reason || '—'}</td><td data-label="Status"><span className={`status-badge status-${appointment.status}`}>{appointment.status}</span></td></tr>)}</tbody></table></div>}
     {state === 'ready' && <PageControls pagination={pagination} onPage={setPage} />}
   </section>;
 }

@@ -3,7 +3,8 @@ import mongoose from 'mongoose';
 import { Doctor } from '../models/Doctor.js';
 import { Appointment } from '../models/Appointment.js';
 import { User } from '../models/User.js';
-import { escapeRegex, parseDoctorListQuery } from '../utils/doctorQuery.js';
+import { buildDoctorDirectoryFilter, parseDoctorListQuery } from '../utils/doctorQuery.js';
+import { specialtiesForSymptom } from '../utils/symptomSearch.js';
 import { createAppointmentService, SLOT_DURATION_MINUTES } from '../services/appointmentService.js';
 
 const router = Router();
@@ -14,8 +15,14 @@ function publicDoctor(doctor) {
     id: doctor.id,
     name: doctor.user.name,
     specialty: doctor.specialty,
+    qualification: doctor.qualification || '',
+    registrationNumber: doctor.registrationNumber || '',
+    languages: doctor.languages || [],
+    clinicAddress: doctor.clinicAddress || '',
+    isFictionalDemo: Boolean(doctor.isFictionalDemo),
     consultationFee: doctor.consultationFee,
     bio: doctor.bio,
+    timezone: doctor.timezone || 'Asia/Kolkata',
     availability: doctor.availability,
   };
 }
@@ -28,22 +35,19 @@ router.get('/', async (req, res) => {
   const parsed = parseDoctorListQuery(req.query);
   if (parsed.error) return invalidQuery(res, parsed.error);
 
-  const { q, specialty, page, limit, feeMax } = parsed.value;
+  const { q, specialty, symptom, page, limit, feeMax } = parsed.value;
   const activeDoctorIds = await User.find({ role: 'doctor', isActive: true }).distinct('_id');
-  const filter = { user: { $in: activeDoctorIds } };
-
-  if (specialty) filter.specialty = new RegExp(escapeRegex(specialty), 'i');
-  if (feeMax !== undefined) filter.consultationFee = { $lte: feeMax };
-
+  let matchingUserIds = [];
   if (q) {
-    const search = new RegExp(escapeRegex(q), 'i');
-    const matchingUsers = await User.find({
+    const search = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    matchingUserIds = await User.find({
       role: 'doctor',
       isActive: true,
       name: search,
     }).distinct('_id');
-    filter.$or = [{ specialty: search }, { bio: search }, { user: { $in: matchingUsers } }];
   }
+  const matchedSpecialties = symptom ? specialtiesForSymptom(symptom) || [] : undefined;
+  const filter = buildDoctorDirectoryFilter({ activeDoctorIds, matchingUserIds, q, specialty, symptomSpecialties: matchedSpecialties, feeMax });
 
   const [doctors, total] = await Promise.all([
     Doctor.find(filter)
@@ -57,17 +61,19 @@ router.get('/', async (req, res) => {
   return res.json({
     doctors: doctors.map(publicDoctor),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    ...(symptom ? { symptomSearch: { recognized: matchedSpecialties.length > 0 } } : {}),
   });
 });
 
 router.get('/:doctorId/slots', async (req, res, next) => {
   try {
-    const { timezone, slots } = await appointmentService.getDoctorSlots(req.params.doctorId, req.query);
+    const { timezone, slots, unavailableSlots } = await appointmentService.getDoctorSlots(req.params.doctorId, req.query);
     return res.json({
       doctorId: req.params.doctorId,
       timezone,
       slotDurationMinutes: SLOT_DURATION_MINUTES,
       slots: slots.map(({ startsAt, endsAt }) => ({ startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() })),
+      unavailableSlots: unavailableSlots.map(({ startsAt, endsAt, reason }) => ({ startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), reason })),
     });
   } catch (error) {
     return next(error);

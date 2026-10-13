@@ -4,6 +4,7 @@ import { validateRegistration } from '../utils/authValidation.js';
 import { validateAvailabilityInput } from './doctorDashboardService.js';
 import { ACTIVE_APPOINTMENT_STATUSES, parseInstant } from './appointmentService.js';
 import { availabilityCoversAppointment } from './doctorDashboardService.js';
+import { validateAdditionalDoctorFields } from '../utils/doctorProfileFields.js';
 
 const SALT_ROUNDS = 12;
 const APPOINTMENT_STATUSES = ['requested', 'accepted', 'rejected', 'cancelled', 'completed'];
@@ -41,6 +42,11 @@ function doctorDto(doctor) {
     specialty: doctor.specialty,
     consultationFee: doctor.consultationFee,
     bio: doctor.bio,
+    qualification: doctor.qualification || '',
+    registrationNumber: doctor.registrationNumber || '',
+    languages: doctor.languages || [],
+    clinicAddress: doctor.clinicAddress || '',
+    isFictionalDemo: Boolean(doctor.isFictionalDemo),
     timezone: doctor.timezone,
     availability: doctor.availability,
   };
@@ -147,6 +153,8 @@ export function createAdminService({ User, Doctor, Appointment, hashPassword = (
     if (typeof fee !== 'number' || !Number.isFinite(fee) || fee < 0 || fee > 1000000) invalid('consultationFee must be a number between 0 and 1000000');
     const bio = input.bio === undefined ? '' : input.bio;
     if (typeof bio !== 'string' || bio.length > 2000) invalid('bio must be 2000 characters or fewer');
+    const additional = validateAdditionalDoctorFields(input, { allowDemoFlag: true });
+    if (additional.error) invalid(additional.error);
     let availability;
     try {
       availability = validateAvailabilityInput({ timezone: input.timezone || 'Asia/Kolkata', availability: input.availability || [] });
@@ -165,7 +173,7 @@ export function createAdminService({ User, Doctor, Appointment, hashPassword = (
     }
     let doctor;
     try {
-      doctor = await Doctor.create({ user: user._id, specialty, consultationFee: fee, bio: bio.trim(), ...availability });
+      doctor = await Doctor.create({ user: user._id, specialty, consultationFee: fee, bio: bio.trim(), ...additional.value, ...availability });
     } catch (error) {
       // Compensate for a failed second insert; clean a possibly partial profile write too.
       await Doctor.deleteOne({ user: user._id });
@@ -295,7 +303,9 @@ export function createAdminService({ User, Doctor, Appointment, hashPassword = (
 
   async function updateDoctorProfile(doctorId, input = {}) {
     if (!mongoose.isValidObjectId(doctorId)) throw new AdminServiceError(404, 'DOCTOR_NOT_FOUND', 'Doctor not found');
-    const allowed = new Set(['specialty', 'bio', 'consultationFee', 'timezone', 'availability']);
+    const additional = validateAdditionalDoctorFields(input, { allowDemoFlag: true });
+    if (additional.error) invalid(additional.error);
+    const allowed = new Set(['specialty', 'bio', 'consultationFee', 'timezone', 'availability', ...additional.allowedFields]);
     const keys = Object.keys(input);
     if (!keys.length || keys.some((key) => !allowed.has(key))) invalid('Only specialty, bio, consultationFee, timezone, and availability can be updated');
     const doctor = await Doctor.findById(doctorId).populate({ path: 'user', select: 'name email role isActive' });
@@ -313,6 +323,7 @@ export function createAdminService({ User, Doctor, Appointment, hashPassword = (
       if (typeof input.consultationFee !== 'number' || !Number.isFinite(input.consultationFee) || input.consultationFee < 0 || input.consultationFee > 1000000) invalid('consultationFee must be a number between 0 and 1000000');
       update.consultationFee = input.consultationFee;
     }
+    Object.assign(update, additional.value);
     if (Object.hasOwn(input, 'timezone') || Object.hasOwn(input, 'availability')) {
       let schedule;
       try {

@@ -29,7 +29,7 @@ Automated tests are optional developer checks. The website does not run tests wh
 
 ## Seed a development doctor
 
-The development-only seed creates or updates the `demo.doctor@medibook.test` doctor account and linked profile. It never creates an admin account, and it refuses to run when `NODE_ENV=production`. Re-running it reuses the same user/profile, restores the demo details and active state, and updates the password hash from the supplied environment variable.
+The development-only seed creates or updates the `demo.doctor@medibook.test` account and linked profile. It is explicitly marked **Fictional demonstration profile** in the application; its biography states that it does not represent a real doctor, and it contains no qualification, registration number, or verification claim. It never creates an admin account, and it refuses to run when `NODE_ENV=production`. Re-running it reuses the same user/profile, restores the demo details and active state, and updates the password hash from the supplied environment variable.
 
 In PowerShell, enter a development-only password at the secure prompt and run the seed from the repository root:
 
@@ -44,7 +44,9 @@ try {
 }
 ```
 
-The password must contain 8–72 UTF-8 bytes. Keep the variable set only for this local command; do not add it to `.env`, source control, or client-side `VITE_` variables. The demo doctor is available Monday through Saturday, 09:00–17:00 in `Asia/Kolkata`.
+The password must contain 8–72 UTF-8 bytes. Keep the variable set only for this local command; do not add it to `.env`, source control, or client-side `VITE_` variables. The fictional demo doctor is available Monday through Saturday, 09:00–17:00 in `Asia/Kolkata`. This script is for local development only; it was not run as part of the profile/search UI work.
+
+Doctor profile credentials such as qualification and medical council registration number are blank unless supplied by the profile owner or an administrator. MediBook does not independently verify those details. Do not enter real professional credentials without project-owner approval and a reliable source.
 
 ## Environment variables
 

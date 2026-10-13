@@ -70,7 +70,12 @@ async function seedDoctor() {
       $set: {
         specialty: 'Family Medicine',
         consultationFee: 650,
-        bio: 'Dr. Maya Desai provides thoughtful primary care for adults and families, with a focus on preventive health and everyday wellbeing.',
+        bio: 'Fictional demonstration profile for local MediBook development. This sample does not represent a real doctor or verified professional credentials.',
+        qualification: '',
+        registrationNumber: '',
+        languages: [],
+        clinicAddress: '',
+        isFictionalDemo: true,
         timezone: 'Asia/Kolkata',
         availability: AVAILABILITY,
       },

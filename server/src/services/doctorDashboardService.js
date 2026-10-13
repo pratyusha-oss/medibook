@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { ACTIVE_APPOINTMENT_STATUSES, validateAppointmentListQuery } from './appointmentService.js';
+import { validateAdditionalDoctorFields } from '../utils/doctorProfileFields.js';
 
 const SLOT_DURATION_MINUTES = 30;
 const WEEKDAY_INDEX = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
@@ -131,6 +132,11 @@ function doctorDto(doctor) {
     specialty: doctor.specialty,
     consultationFee: doctor.consultationFee,
     bio: doctor.bio,
+    qualification: doctor.qualification || '',
+    registrationNumber: doctor.registrationNumber || '',
+    languages: doctor.languages || [],
+    clinicAddress: doctor.clinicAddress || '',
+    isFictionalDemo: Boolean(doctor.isFictionalDemo),
     timezone: doctor.timezone,
     availability: doctor.availability,
   };
@@ -235,10 +241,10 @@ export function createDoctorDashboardService({ Doctor, Appointment, clock = () =
 
   async function updateProfile(userId, input = {}) {
     const doctor = await findDoctorForUser(userId);
-    const allowed = new Set(['specialty', 'bio', 'consultationFee']);
+    const allowed = new Set(['specialty', 'bio', 'consultationFee', 'qualification', 'registrationNumber', 'languages', 'clinicAddress']);
     const fields = Object.keys(input);
     if (!fields.length || fields.some((field) => !allowed.has(field))) {
-      throw new DoctorDashboardError(400, 'INVALID_PROFILE', 'Only specialty, bio, and consultationFee can be updated');
+      throw new DoctorDashboardError(400, 'INVALID_PROFILE', 'Only profile details can be updated; roles and account data cannot be changed');
     }
     const update = {};
     if (Object.hasOwn(input, 'specialty')) {
@@ -259,6 +265,9 @@ export function createDoctorDashboardService({ Doctor, Appointment, clock = () =
       }
       update.consultationFee = input.consultationFee;
     }
+    const additional = validateAdditionalDoctorFields(input);
+    if (additional.error) throw new DoctorDashboardError(400, 'INVALID_PROFILE', additional.error);
+    Object.assign(update, additional.value);
     const updated = await Doctor.findByIdAndUpdate(doctor._id, { $set: update }, { new: true, runValidators: true })
       .populate({ path: 'user', select: 'name role isActive' });
     if (!updated) throw new DoctorDashboardError(404, 'DOCTOR_PROFILE_NOT_FOUND', 'Doctor profile not found');

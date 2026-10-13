@@ -89,6 +89,18 @@ test('doctor provisioning creates linked active doctor records and omits credent
   assert.equal(JSON.stringify(result).includes('hashed:'), false);
 });
 
+test('admin provisioning saves profile fields and labels fictional demos without inventing credentials', async () => {
+  const { service, calls } = modelHarness();
+  await service.createDoctor({
+    name: 'Sample Doctor', email: 'sample@example.test', password: 'temporary-pass-123', specialty: 'Neurology', consultationFee: 800,
+    qualification: '', registrationNumber: '', languages: ['English'], clinicAddress: '', isFictionalDemo: true,
+  });
+  assert.equal(calls.profilesCreated[0].isFictionalDemo, true);
+  assert.equal(calls.profilesCreated[0].qualification, '');
+  assert.equal(calls.profilesCreated[0].registrationNumber, '');
+  assert.deepEqual(calls.profilesCreated[0].languages, ['English']);
+});
+
 test('duplicate email maps to 409 without creating a profile', async () => {
   const { service, calls } = modelHarness({ userCreate: async () => { throw Object.assign(new Error('duplicate'), { code: 11000 }); } });
   await assert.rejects(service.createDoctor({ name: 'Dr. Ada Example', email: 'ada@example.test', password: 'temporary-pass-123', specialty: 'Cardiology', consultationFee: 700 }),
