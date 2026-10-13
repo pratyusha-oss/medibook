@@ -26,6 +26,14 @@ Request bodies are validated before database writes, JSON input size is limited,
 
 The Vite client is built from the repository root workspace and emits `client/dist`. `VITE_API_BASE_URL` is public build-time configuration and points to the `/api` base URL. Render runs the Express workspace from the root lockfile and supplies the listening `PORT`. The API waits for MongoDB and model indexes before opening its HTTP port; the health endpoint is consequently available only after database startup succeeds. Atlas credentials and the JWT signing key are Render-only secrets. Atlas access is restricted to the Render service's outbound IP ranges or a private network path. The first-admin bootstrap is a separately invoked, one-time operator action, not part of the service lifecycle.
 
+The client keeps the JWT in `sessionStorage`, so it is cleared when the browser tab's session ends. The API client adds it as a Bearer token for protected requests. The frontend controls navigation by role, but the backend independently checks authentication and role on every protected route.
+
+## Patient interface and search
+
+The home page uses a restrained MediBook palette and responsive CSS layouts for the directory, profile, and dashboard views. Loading uses skeleton placeholders; empty and API-error states are shown separately. Doctor discovery supports name/profile text, specialty, fee ceiling, and the backend's explicit symptom map: fever maps to general/internal/family/general-practice specialties, migraine to neurology, and back pain to orthopaedics/orthopedics/musculoskeletal/physiotherapy. Unknown symptom terms return no matches. The search narrows discovery only and does not diagnose.
+
+The home page and booking panel display the emergency alert: “For medical emergencies, contact your local emergency services immediately (112/108). Don't wait for an online appointment”. The warning is informational; it does not change appointment submission behavior.
+
 ## Doctor workspace
 
 Doctor dashboard routes require an authenticated doctor role and resolve the Doctor profile from the token's current User ID. Appointment list and status queries include that linked profile ID, so a doctor cannot read or change another doctor's records. Appointment pagination totals and dashboard summary counts come from database count queries, not the current page. Status transitions are atomic: a doctor may accept or reject a `requested` appointment, or complete an `accepted` appointment. Rejection and completion release the active slot key.
@@ -34,6 +42,6 @@ Doctors can edit only their linked profile's specialty, biography, consultation 
 
 ## Public doctor directory and booking
 
-The public directory combines free-text, specialty, consultation-fee, and explicit symptom filters. Symptom terms map to an allowlisted set of specialties in `server/src/utils/symptomSearch.js`; unrecognized terms match nothing, and the feature does not diagnose. The slot API returns future bookable slots plus active-booked slots as a separate unavailable list. The interface disables those booked choices and uses the doctor's timezone for date boundaries and labels. Server validation and the unique active-slot index remain authoritative if a browser sends a past or already-taken time. The seeded development doctor is explicitly labeled fictional and carries no professional credentials.
+The public directory combines free-text, specialty, consultation-fee, and explicit symptom filters. Symptom terms map to an allowlisted set of specialties in `server/src/utils/symptomSearch.js`; unrecognized terms match nothing, and the feature does not diagnose. The slot API returns future bookable slots plus active-booked slots as a separate unavailable list. The interface disables those booked choices and uses the doctor's timezone for date boundaries and labels. Server validation and the unique active-slot index remain authoritative if a browser sends a past or already-taken time.
 
-The doctor-profile schema change is additive: new text/list fields default to blank values and the fictional-demo flag defaults to false for existing documents. No database migration or record update was run for this change. Any existing production profiles need a separate reviewed data update before they can be classified as fictional demos or given credentials.
+Doctor profile fields for qualification, registration number, languages, clinic/OPD address, and fictional-demo labeling have schema defaults. A blank registration number or qualification is not evidence that a profile is fictional or professionally verified. MediBook does not independently validate credentials, and existing production records should be reviewed before changing their content or fictional-demo label.

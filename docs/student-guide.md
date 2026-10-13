@@ -59,9 +59,12 @@ The doctor profile links to the doctor account through `Doctor.user`. An appoint
 1. A patient registers or logs in. The API checks the input, hashes new passwords with bcrypt, and returns a signed JWT after login.
 2. The frontend keeps that token in the current browser tab's `sessionStorage`. `api.js` attaches it to protected requests as a Bearer token.
 3. The patient searches the public doctor directory and opens a profile.
+   The directory combines doctor-name/profile search, specialty, fee ceiling, and the explicit symptom map documented in [the API guide](api.md). Symptom search helps narrow a directory; it is not a diagnosis.
 4. The browser requests slots for a date range. The server reads the doctor's weekly local-time hours and timezone, then returns future 30-minute slots as UTC instants.
 5. The patient chooses a slot and submits the doctor ID, slot start, and optional reason. The server calculates the end time itself; it does not trust a patient ID or end time supplied by the browser.
 6. A successful request creates a `requested` appointment. The patient can see it in appointment history and can cancel an eligible future appointment.
+
+The home page and booking view both show an emergency alert directing users with medical emergencies to local emergency services (112/108). It remains visible as a reminder and does not replace emergency care.
 
 ### Doctor review
 
@@ -116,4 +119,4 @@ If there is no suitable demo appointment, create one through the app before the 
 
 ## Tests are for developers, not website visitors
 
-The existing backend tests are run manually from the repository root with `npm test`. The production frontend build can be checked with `npm run build --workspace client`. These commands do not start the website and are not run when someone visits it. For a live presentation, use the deployed frontend; for local development, follow the setup steps in the root README.
+The backend suite contains 55 automated tests in the current codebase and is run from the repository root with `npm test`. The production frontend build command is `npm run build --workspace client` (the root shortcut is `npm run build`). These commands do not start the website and are not run when someone visits it. For a live presentation, use the deployed frontend; for local development, follow the setup steps in the root README.
