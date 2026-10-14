@@ -366,6 +366,12 @@ a { color: inherit; }
 .search-panel { display: grid; grid-template-columns: minmax(150px, 1.35fr) minmax(190px, 1.3fr) minmax(130px, .9fr) minmax(115px, .7fr) auto; gap: 5px; }
 .search-field, .search-main { min-width: 0; }
 .search-field input { min-width: 0; }
+.doctor-search-wrap { position: relative; min-width: 0; }
+.doctor-suggestions { position: absolute; z-index: 20; top: calc(100% + 5px); left: 0; right: 0; display: grid; gap: 2px; margin: 0; border: 1px solid #e1e5e8; border-radius: 9px; padding: 5px; background: #fff; box-shadow: 0 8px 22px rgba(31, 41, 51, .12); list-style: none; }
+.doctor-suggestions button { display: grid; width: 100%; min-height: 44px; gap: 3px; border: 0; border-radius: 6px; padding: 7px 9px; background: transparent; color: var(--ink); text-align: left; }
+.doctor-suggestions button:hover, .doctor-suggestions button:focus-visible { outline: 0; background: #f3f6f4; }
+.doctor-suggestions strong { font-size: .78rem; font-weight: 600; }
+.doctor-suggestions span { color: var(--muted); font-size: .7rem; }
 .search-field { border-right: 0; border-left: 1px solid #edf0eb; }
 .search-main { border-left: 0; }
 .fee-field { width: auto; }
@@ -409,6 +415,7 @@ a { color: inherit; }
 .hero-search { min-width: 0; }
 .hero-search h2 { margin: 0 0 10px; color: var(--ink); font-family: var(--serif); font-size: 1.45rem; font-weight: 400; letter-spacing: -.025em; }
 .hero-search .search-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-height: 0; padding: 10px; }
+.hero-search .doctor-search-wrap { grid-column: 1; }
 .hero-search .search-field,
 .hero-search .search-main,
 .hero-search .fee-field { width: auto; min-width: 0; min-height: 44px; border: 1px solid #e5e9e6; border-radius: 7px; padding: 0 11px; }
@@ -417,7 +424,7 @@ a { color: inherit; }
 .hero-search .search-field input { min-width: 0; }
 .hero-search .button-search { grid-column: 2; width: 100%; min-height: 44px; }
 .hero-search .search-disclaimer { margin: 8px 0 0; }
-.hero .emergency-alert { grid-column: 1 / -1; width: 100%; max-width: none; margin: 0; padding: 9px 12px; font-size: .75rem; }
+.hero .emergency-alert { grid-column: 1 / -1; width: 100%; max-width: none; margin: 0; padding: 9px 12px; font-size: .82rem; }
 .directory-section { padding-top: 26px; }
 .directory-section .section-heading { margin-bottom: 16px; }
 .directory-section .results-meta { margin: 17px 0 12px; }
@@ -435,6 +442,7 @@ a { color: inherit; }
   .hero-search .search-main,
   .hero-search .search-symptom,
   .hero-search .button-search { grid-column: 1 / -1; }
+  .hero-search .doctor-search-wrap { grid-column: 1 / -1; }
   .directory-section { padding: 28px 4% 58px; }
   .directory-section .section-heading { margin-bottom: 12px; }
 }
@@ -447,6 +455,6 @@ a { color: inherit; }
   .hero-search .search-main,
   .hero-search .search-symptom,
   .hero-search .button-search { grid-column: 1; }
-  .hero .emergency-alert { font-size: .72rem; }
+  .hero-search .doctor-search-wrap { grid-column: 1; }
   .directory-section { padding-top: 24px; }
 }

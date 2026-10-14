@@ -68,6 +68,8 @@ function App() {
 
   const [searchForm, setSearchForm] = useState({ q: '', symptom: '', specialty: '', feeMax: '' });
   const [searchQuery, setSearchQuery] = useState({ q: '', symptom: '', specialty: '', feeMax: '' });
+  const [doctorSuggestions, setDoctorSuggestions] = useState([]);
+  const [suggestionsVisible, setSuggestionsVisible] = useState(false);
   const [doctors, setDoctors] = useState([]);
   const [doctorPagination, setDoctorPagination] = useState(EMPTY_PAGINATION);
   const [directoryStatus, setDirectoryStatus] = useState('loading');
@@ -129,6 +131,34 @@ function App() {
       });
     return () => { active = false; };
   }, [searchQuery, doctorPagination.page]);
+
+  useEffect(() => {
+    const query = searchForm.q.trim();
+    if (query.length < 2) {
+      setDoctorSuggestions([]);
+      setSuggestionsVisible(false);
+      return undefined;
+    }
+
+    let active = true;
+    setDoctorSuggestions([]);
+    const timeout = window.setTimeout(() => {
+      const params = new URLSearchParams({ q: query, limit: '5' });
+      apiRequest(`/doctors?${params}`)
+        .then((data) => {
+          if (active) setDoctorSuggestions(data.doctors || []);
+        })
+        .catch(() => {
+          // Suggestions are optional; the full search form still reports API errors.
+          if (active) setDoctorSuggestions([]);
+        });
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [searchForm.q]);
 
   useEffect(() => {
     if (!selectedDoctor || !selectedDate) return undefined;
@@ -324,6 +354,7 @@ function App() {
 
   function searchDoctors(event) {
     event.preventDefault();
+    setSuggestionsVisible(false);
     setDoctorPagination((pagination) => ({ ...pagination, page: 1 }));
     setSearchQuery({
       q: searchForm.q.trim(),
@@ -423,7 +454,10 @@ function App() {
               <div className="hero-search">
                 <h2>Find a doctor</h2>
                 <form className="search-panel" onSubmit={searchDoctors}>
-                  <label className="search-field search-main"><span className="sr-only">Search by doctor or care</span><input aria-label="Search doctors" placeholder="Doctor or care…" value={searchForm.q} onChange={(event) => setSearchForm({ ...searchForm, q: event.target.value })} maxLength={80} /></label>
+                  <div className="doctor-search-wrap" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSuggestionsVisible(false); }}>
+                    <label className="search-field search-main"><span className="sr-only">Search by doctor or care</span><input aria-label="Search doctors" aria-autocomplete="list" aria-controls="doctor-search-suggestions" aria-expanded={suggestionsVisible && doctorSuggestions.length > 0} placeholder="Doctor or care…" value={searchForm.q} onFocus={() => setSuggestionsVisible(doctorSuggestions.length > 0)} onChange={(event) => { setSearchForm({ ...searchForm, q: event.target.value }); setSuggestionsVisible(true); }} maxLength={80} /></label>
+                    {suggestionsVisible && doctorSuggestions.length > 0 && <ul className="doctor-suggestions" id="doctor-search-suggestions" aria-label="Doctor search suggestions">{doctorSuggestions.map((doctor) => <li key={doctor.id}><button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearchForm((form) => ({ ...form, q: doctor.name })); setSuggestionsVisible(false); }}><strong>{doctorDisplayName(doctor.name)}</strong><span>{doctor.specialty} · ₹{Number(doctor.consultationFee).toLocaleString('en-IN')}</span></button></li>)}</ul>}
+                  </div>
                   <label className="search-field search-symptom"><span className="sr-only">Search by symptom</span><input aria-label="Search by symptom" placeholder="Fever, migraine, back pain" value={searchForm.symptom} onChange={(event) => setSearchForm({ ...searchForm, symptom: event.target.value })} maxLength={80} /></label>
                   <label className="search-field"><span className="sr-only">Specialty filter</span><input aria-label="Filter by specialty" placeholder="Specialty" value={searchForm.specialty} onChange={(event) => setSearchForm({ ...searchForm, specialty: event.target.value })} maxLength={80} /></label>
                   <label className="search-field fee-field"><span className="fee-prefix">₹</span><span className="sr-only">Maximum consultation fee</span><input aria-label="Maximum consultation fee" inputMode="numeric" type="number" min="0" max="1000000" placeholder="Max fee" value={searchForm.feeMax} onChange={(event) => setSearchForm({ ...searchForm, feeMax: event.target.value })} /></label>
